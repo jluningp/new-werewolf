@@ -1,27 +1,8 @@
 open Core
-module Username = String
-
-module Role = struct
-  type t = Robber | Werewolf
-end
+open Shared
 
 module Random_cache = struct
   type t = { seer_doesnt_see_card : int; werewolf_sees_card : int }
-end
-
-module Page = struct
-  module Element = struct
-    type t =
-      | Text of string
-      | Cards of Role.t list
-      | Choose_user of { choose_this_many : int; users : Username.t list }
-  end
-
-  type t = Element.t list
-end
-
-module Input = struct
-  type t = Ack | Choose_user of Username.t list
 end
 
 module Phase = struct
@@ -229,7 +210,7 @@ let rec maybe_change_phase t =
         t.phase <- Day;
         maybe_change_phase t )
 
-let add_input t username input =
+let on_input t username input =
   match Hashtbl.find t.users username with
   | None -> Or_error.error_string "Unknown user"
   | Some user ->
