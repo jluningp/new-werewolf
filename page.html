@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+	  text-align: center;
+	  background-color: black;
+	  color:white;
+      }
+      #body {
+	  margin: 0 auto;
+	  text-align: left;
+	  width: 80%;
+	  color:white;
+      }
+      #game {
+	  padding: 0.8em;
+	  background-color:#424242;
+	  border-radius:10px;
+      }
+      div {
+	  padding:0.2em;
+      }
+      h3 {
+	  font-family: 'Courier New', monospace;
+      }
+      #endgame {
+	  text-align: right;
+	  cursor:pointer;
+      }
+
+      /* Chrome, Safari, Edge, Opera */
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+	  -webkit-appearance: none;
+	  margin: 0;
+      }
+
+      /* Firefox */
+      input[type=number] {
+	  -moz-appearance: textfield;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>ONE NIGHT WEREWOLF</h3>
+    <div id=body>
+      <div id=game></div>
+      <div id="endgame"><small><a onclick="endGame()">End game</a></small></div>
+    </div>
+  </body>
+  <script src="script.js"></script>
+</html>

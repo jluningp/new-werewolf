@@ -100,7 +100,7 @@ let get_page_for_robber t (user : User.t) =
         Choose_user { choose_this_many = 1; users = other_users };
       ]
   | [ Choose_user [ _ ]; Ack ] ->
-      [ Text "Your new card"; Cards [ user.current_role ] ]
+      [ Text "Your new card"; Cards [ user.current_role ]; Ack_button ]
   | [ Ack; Choose_user _; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game" ]
 
@@ -125,11 +125,13 @@ let get_page_for_werewolf t (user : User.t) =
             Page.Element.Text
               "There are no other werewolves. Card from the center:";
             Cards center_cards;
+            Ack_button;
           ]
       | _ :: _ ->
           [
             Text "These are the other werewolves";
             Text (String.concat ~sep:", " other_werewolves);
+            Ack_button;
           ] )
   | [ Ack; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game." ]
@@ -141,7 +143,9 @@ let get_page_for_user t (user : User.t) =
       | Some Ack -> [ Page.Element.Text "Waiting" ]
       | _ ->
           [
-            Page.Element.Text "This is your card"; Cards [ user.original_role ];
+            Page.Element.Text "This is your card";
+            Cards [ user.original_role ];
+            Ack_button;
           ] )
   | Day -> [ Text "Discuss" ]
   | Vote | Results -> [ Text "Not yet supported" ]
