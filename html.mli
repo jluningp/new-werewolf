@@ -24,4 +24,8 @@ val br : t
 
 val refresh_page : t
 
+val b : Attr.t list -> t list -> t
+
+val img : Attr.t list -> t list -> t
+
 val to_string : t -> string

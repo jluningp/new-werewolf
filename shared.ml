@@ -10,7 +10,7 @@ module Role = struct
     | "Werewolf" -> Werewolf
     | _ -> failwith "Unknown role"
 
-  let to_string = function Robber -> "Robber" | Werewolf -> "Werewolf"
+  let _to_string = function Robber -> "Robber" | Werewolf -> "Werewolf"
 end
 
 module Page = struct
@@ -25,16 +25,22 @@ module Page = struct
       | Text _ | Cards _ -> false
       | Choose_user _ | Ack_button -> true
 
+    let card_image role =
+      match role with
+      | Role.Werewolf -> "images/werewolves.png"
+      | Robber -> "images/robbers.png"
+
     let to_html element =
       let open Html in
       match element with
       | Text str -> p [] [ text str ]
       | Cards [] -> p [] [ text "No Cards" ]
-      | Cards [ card ] -> p [] [ text (Role.to_string card) ]
+      | Cards [ card ] -> img [ ("src", card_image card) ] []
       | Cards cards ->
-          let cards = List.map cards ~f:Role.to_string in
-          let cards = List.map cards ~f:(fun card -> p [] [ text card ]) in
-          ul [] cards
+          let cards =
+            List.map cards ~f:(fun card -> img [ ("src", card_image card) ] [])
+          in
+          div [] cards
       | Choose_user { choose_this_many; users } ->
           let user_select =
             List.concat_map users ~f:(fun user ->
@@ -56,8 +62,16 @@ module Page = struct
           in
           div []
             ( user_select
-            @ [ button [ ("onclick", "chooseUsers()") ] [ text "GO" ] ] )
-      | Ack_button -> button [ ("onclick", "ack()") ] [ text "OK" ]
+            @ [
+                br;
+                div
+                  [ ("style", "text-align:center;") ]
+                  [ button [ ("onclick", "chooseUsers()") ] [ text "GO" ] ];
+              ] )
+      | Ack_button ->
+          div
+            [ ("style", "text-align:center;") ]
+            [ button [ ("onclick", "ack()") ] [ text "OK" ] ]
   end
 
   type t = Element.t list

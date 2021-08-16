@@ -18,6 +18,8 @@ type t =
   | Text of string
   | Br
   | Refresh_page
+  | B of Attr.t list * t list
+  | Img of Attr.t list * t list
 
 let div a t = Div (a, t)
 
@@ -39,6 +41,10 @@ let br = Br
 
 let refresh_page = Refresh_page
 
+let b a t = B (a, t)
+
+let img a t = Img (a, t)
+
 let attrs_to_string attrs =
   List.map attrs ~f:Attr.to_string |> String.concat ~sep:" "
 
@@ -57,6 +63,8 @@ and to_string = function
   | Input (a, t) -> to_html_tags "input" (a, t)
   | Text str -> str
   | Br -> "<br>"
+  | B (a, t) -> to_html_tags "b" (a, t)
+  | Img (a, t) -> to_html_tags "img" (a, t)
   | Refresh_page ->
       to_string
         (div

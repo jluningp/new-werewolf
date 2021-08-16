@@ -109,10 +109,13 @@ module Setup = struct
       let players = String.concat ~sep:", " t.users in
       div []
         [
-          div [ ("style", "text-align:center") ] [ text "New Game" ];
+          div [ ("style", "text-align:center") ] [ b [] [ text "New Game" ] ];
           br;
           br;
-          text ("Players: " ^ players ^ "  (refresh to see new players)");
+          text
+            ( "Players: " ^ players
+            ^ if is_admin then "           (refresh to see new players)" else ""
+            );
           br;
           br;
           ( if is_admin then text "Select 3 more roles than players:"

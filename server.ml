@@ -14,7 +14,9 @@ module Query = struct
     | Action of { username : Username.t; action : Action.t }
     | File of string
 
-  let available_files = [ "script.js" ] |> String.Set.of_list
+  let available_files =
+    [ "script.js"; "images/werewolves.png"; "images/robbers.png" ]
+    |> String.Set.of_list
 
   let get_username uri = Uri.get_query_param uri "username"
 
