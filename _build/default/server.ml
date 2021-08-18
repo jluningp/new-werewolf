@@ -75,31 +75,9 @@ module Query = struct
         if Set.mem available_files filename then Some (File filename) else None
 end
 
-let server () =
+let server port () =
   let t = { state = State.create () } in
   let callback ~body:_ _conn req =
-    (* let uri = req |> Request.uri |> Uri.to_string in
-       let meth = req |> Request.meth |> Code.string_of_method in
-       let headers = req |> Request.headers |> Header.to_string in
-       let%bind body = Cohttp_async.Body.to_string body in
-       let query = Query.parse (Request.uri req) in
-       let response = response t query in
-       let body =
-         sprintf
-           "Uri: %s\n\
-            Query: %s\n\
-            Method: %s\n\
-            Headers\n\
-            Headers: %s\n\
-            Body: %s\n\
-            Response: %s\n\
-            Path: %s\n"
-           uri
-           (List.to_string
-              (Uri.query (Request.uri req))
-              ~f:(fun (s, l) -> s ^ ":" ^ List.to_string l ~f:Fn.id))
-           meth headers body response
-           (Uri.path (Request.uri req)) *)
     match Query.parse (Request.uri req) with
     | None -> Server.respond_string "Unknown request"
     | Some query -> (
@@ -114,12 +92,16 @@ let server () =
   in
   let%bind t =
     Server.create ~mode:`TCP ~on_handler_error:`Ignore
-      (Async_unix.Tcp.Where_to_listen.of_port 49633)
+      (Async_unix.Tcp.Where_to_listen.of_port port)
       callback
   in
   printf "Serving at port %n" (Server.listening_on t);
   Deferred.never ()
 
 let () =
-  Command.async ~summary:"Werewolf server" (Command.Param.return server)
-  |> Command.run
+  Command.run
+    (Command.async ~summary:"The One Night Werewolf server"
+       (Command.Spec.map
+          (Command.Param.flag "port" ~doc:"port"
+             (Command.Param.required Command.Param.int))
+          ~f:server))
