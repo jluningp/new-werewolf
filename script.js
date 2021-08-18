@@ -82,20 +82,22 @@ function ack () {
     get("action/input/ack?" + usernameQuery(), getUpdatedPage);
 } 
 
-function changeWerewolf () {
-    var werewolves = document.getElementById("werewolves").value;
-    if (!(isNaN(werewolves))) { 
-	get("action/set_role?role=Werewolf&count=" + werewolves + "&" + usernameQuery(), getUpdatedPage);
+function reveal () {
+    get("action/input/reveal?" + usernameQuery(), getUpdatedPage);
+} 
+
+function changeNumberedRole (role) {
+    var count = document.getElementById(role).value;
+    if (!(isNaN(count))) {
+	get("action/set_role?role=" + role + "&count=" + count + "&" + usernameQuery(), getUpdatedPage);
     }
 } 
 
-
-    
-function changeRobber () {
-    var robber = document.getElementById("robber").checked;
-    var count = robber ? "1" : "0";
-    get("action/set_role?role=Robber&count=" + count + "&" + usernameQuery(), getUpdatedPage);
-} 
+function changeSingleRole (role) {
+    var role_checked = document.getElementById(role).checked;
+    var count = role_checked ? "1" : "0";
+    get("action/set_role?role=" + role + "&count=" + count + "&" + usernameQuery(), getUpdatedPage);
+}    
 
 function getSelectedUsers () {
     var items = document.getElementsByName("users");

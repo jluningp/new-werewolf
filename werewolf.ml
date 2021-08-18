@@ -83,9 +83,91 @@ let create roles users =
 
 let is_users_turn night_phase (user : User.t) =
   match (night_phase, user.original_role) with
-  | Phase.Night.Viewer, Werewolf -> true
+  | Phase.Night.Viewer, (Werewolf | Seer | Mason) -> true
   | Robber, Robber -> true
+  | Troublemaker, Troublemaker -> true
+  | Insomniac, Insomniac -> true
   | _, _ -> false
+
+let get_page_for_insomniac _t (user : User.t) =
+  match user.inputs with
+  | [ Ack ] ->
+      [
+        Page.Element.Text "Your role is";
+        Cards [ user.current_role ];
+        Ack_button;
+      ]
+  | [ Ack; Ack ] -> [ Text "Waiting" ]
+  | _ -> [ Text "An error has occurred. Please start a new game" ]
+
+let get_page_for_mason t (user : User.t) =
+  match user.inputs with
+  | [ Ack ] -> (
+      let other_masons =
+        Hashtbl.filter t.users ~f:(fun other_user ->
+            match other_user.original_role with
+            | Role.Mason ->
+                not (Username.equal other_user.username user.username)
+            | _ -> false)
+        |> Hashtbl.keys
+      in
+      match other_masons with
+      | [] -> [ Page.Element.Text "There are no other masons."; Ack_button ]
+      | [ mason ] -> [ Text (sprintf "The other mason is %s." mason) ]
+      | masons ->
+          [
+            Text "These are the other masons:";
+            Text (String.concat ~sep:", " masons);
+          ] )
+  | [ Ack; Ack ] -> [ Text "Waiting" ]
+  | _ -> [ Text "An error has occurred. Please start a new game" ]
+
+let get_page_for_troublemaker t (user : User.t) =
+  match user.inputs with
+  | [ Ack ] ->
+      let other_users =
+        List.filter (Hashtbl.keys t.users) ~f:(fun username ->
+            not (Username.equal user.username username))
+      in
+      [
+        Page.Element.Text "Choose two players to swap";
+        Choose_user
+          { choose_this_many = 2; users = other_users; or_center = false };
+      ]
+  | [ Choose_user _; Ack ] -> [ Text "Waiting" ]
+  | _ -> [ Text "An error has occurred. Please start a new game" ]
+
+let get_page_for_seer t (user : User.t) =
+  match user.inputs with
+  | [ Ack ] ->
+      let other_users =
+        List.filter (Hashtbl.keys t.users) ~f:(fun username ->
+            not (Username.equal user.username username))
+      in
+
+      [
+        Page.Element.Text
+          "View another player's card, or two of the center cards.";
+        Choose_user
+          { choose_this_many = 1; users = other_users; or_center = true };
+      ]
+  | [ Choose_user [ username ]; Ack ] -> (
+      match Hashtbl.find t.users username with
+      | None -> [ Text "Seer chose nonexistent user. Please start a new game." ]
+      | Some other_user ->
+          [
+            Text (sprintf "%s's card:" other_user.username);
+            Cards [ other_user.current_role ];
+            Ack_button;
+          ] )
+  | [ View_center_cards; Ack ] ->
+      let center_cards =
+        List.filteri t.center_cards ~f:(fun idx _ ->
+            t.random_cache.seer_doesnt_see_card <> idx)
+      in
+      [ Text "Two of the center cards:"; Cards center_cards; Ack_button ]
+  | [ Ack; (View_center_cards | Choose_user _); Ack ] -> [ Text "Waiting" ]
+  | _ -> [ Text "An error has occurred. Please start a new game" ]
 
 let get_page_for_robber t (user : User.t) =
   match user.inputs with
@@ -97,7 +179,8 @@ let get_page_for_robber t (user : User.t) =
 
       [
         Page.Element.Text "Choose a player to rob";
-        Choose_user { choose_this_many = 1; users = other_users };
+        Choose_user
+          { choose_this_many = 1; users = other_users; or_center = false };
       ]
   | [ Choose_user [ _ ]; Ack ] ->
       [ Text "Your new card"; Cards [ user.current_role ]; Ack_button ]
@@ -147,18 +230,39 @@ let get_page_for_user t (user : User.t) =
             Cards [ user.original_role ];
             Ack_button;
           ] )
-  | Day -> [ Text "Discuss" ]
-  | Vote | Results -> [ Text "Not yet supported" ]
+  | Day ->
+      [
+        Text
+          "Discuss and vote. Once you have voted, hit the \"Reveal Cards\" \
+           button.";
+        Reveal_button;
+      ]
+  | Vote -> [ Text "Not yet supported" ]
+  | Results ->
+      ( t.users |> Hashtbl.data
+      |> List.concat_map ~f:(fun user ->
+             [
+               Page.Element.Text user.username;
+               Text "New Role";
+               Cards [ user.current_role ];
+             ]) )
+      @ [ No_refresh ]
   | Night night_phase -> (
       if not (is_users_turn night_phase user) then [ Text "Waiting" ]
       else
         match user.original_role with
         | Robber -> get_page_for_robber t user
-        | Werewolf -> get_page_for_werewolf t user )
+        | Werewolf -> get_page_for_werewolf t user
+        | Seer -> get_page_for_seer t user
+        | Villager -> [ Text "Waiting" ]
+        | Troublemaker -> get_page_for_troublemaker t user
+        | Mason -> get_page_for_mason t user
+        | Insomniac -> get_page_for_insomniac t user )
 
 let validate_input t (user : User.t) (input : Input.t) =
   match t.phase with
-  | Day | Vote | Results -> false
+  | Day -> ( match input with Reveal -> true | _ -> false )
+  | Vote | Results -> false
   | View_roles -> (
       match (List.hd user.inputs, input) with None, Ack -> true | _ -> false )
   | Night phase -> (
@@ -174,7 +278,33 @@ let validate_input t (user : User.t) (input : Input.t) =
             match (user.inputs, input) with
             | [], Ack -> true
             | [ Ack ], Ack -> true
-            | _ -> false ) )
+            | _ -> false )
+        | Seer -> (
+            match (user.inputs, input) with
+            | [], Ack -> true
+            | [ Ack ], Choose_user [ username ] -> Hashtbl.mem t.users username
+            | [ Ack ], View_center_cards -> true
+            | [ Choose_user _; Ack ], Ack -> true
+            | [ View_center_cards; Ack ], Ack -> true
+            | _ -> false )
+        | Troublemaker -> (
+            match (user.inputs, input) with
+            | [], Ack -> true
+            | [ Ack ], Choose_user [ user1; user2 ] ->
+                Hashtbl.mem t.users user1 && Hashtbl.mem t.users user2
+            | _ -> false )
+        | Mason -> (
+            match (user.inputs, input) with
+            | [], Ack -> true
+            | [ Ack ], Ack -> true
+            | _ -> false )
+        | Insomniac -> (
+            match (user.inputs, input) with
+            | [], Ack -> true
+            | [ Ack ], Ack -> true
+            | _ -> false )
+        | Villager -> (
+            match (user.inputs, input) with [], Ack -> true | _ -> false ) )
 
 let rec maybe_change_phase t =
   match t.phase with
@@ -187,15 +317,22 @@ let rec maybe_change_phase t =
       if phase_over then (
         t.phase <- Night Viewer;
         maybe_change_phase t )
-  | Day | Vote | Results -> ()
-  | Night (Troublemaker | Insomniac) ->
-      t.phase <- Day;
-      maybe_change_phase t
+  | Day ->
+      let phase_over =
+        Hashtbl.exists t.users ~f:(fun user ->
+            List.exists user.inputs ~f:(function Reveal -> true | _ -> false))
+      in
+      if phase_over then (
+        t.phase <- Results;
+        maybe_change_phase t )
+  | Vote | Results -> ()
   | Night Viewer ->
       let phase_over =
         Hashtbl.filter t.users ~f:(fun user ->
             match user.original_role with
             | Werewolf -> not (List.length user.inputs = 2)
+            | Seer -> not (List.length user.inputs = 3)
+            | Mason -> not (List.length user.inputs = 2)
             | _ -> false)
         |> Hashtbl.is_empty
       in
@@ -207,6 +344,28 @@ let rec maybe_change_phase t =
         Hashtbl.filter t.users ~f:(fun user ->
             match user.original_role with
             | Robber -> not (List.length user.inputs = 3)
+            | _ -> false)
+        |> Hashtbl.is_empty
+      in
+      if phase_over then (
+        t.phase <- Night Troublemaker;
+        maybe_change_phase t )
+  | Night Troublemaker ->
+      let phase_over =
+        Hashtbl.filter t.users ~f:(fun user ->
+            match user.original_role with
+            | Troublemaker -> not (List.length user.inputs = 2)
+            | _ -> false)
+        |> Hashtbl.is_empty
+      in
+      if phase_over then (
+        t.phase <- Night Insomniac;
+        maybe_change_phase t )
+  | Night Insomniac ->
+      let phase_over =
+        Hashtbl.filter t.users ~f:(fun user ->
+            match user.original_role with
+            | Insomniac -> not (List.length user.inputs = 2)
             | _ -> false)
         |> Hashtbl.is_empty
       in
@@ -232,7 +391,24 @@ let on_input t username input =
                     other_user.current_role <- user.current_role;
                     user.current_role <- other_role )
             | _ -> assert false )
-        | Werewolf -> () );
+        | Troublemaker -> (
+            match input with
+            | Ack -> ()
+            | Choose_user [ user1; user2 ] -> (
+                match
+                  (Hashtbl.find t.users user1, Hashtbl.find t.users user2)
+                with
+                | None, _ | _, None -> assert false
+                | Some user1, Some user2 ->
+                    let role1 = user1.current_role in
+                    user1.current_role <- user2.current_role;
+                    user2.current_role <- role1 )
+            | _ -> assert false )
+        | Werewolf -> ()
+        | Mason -> ()
+        | Seer -> ()
+        | Insomniac -> ()
+        | Villager -> () );
         maybe_change_phase t;
         Ok () )
       else Or_error.error_string "Invalid input"

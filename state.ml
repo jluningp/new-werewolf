@@ -51,51 +51,58 @@ module Setup = struct
     mutable users : Username.t list;
   }
 
-  let create () = { roles = []; users = [] }
+  let create ~roles = { roles; users = [] }
+
+  let number_select t role ~is_admin =
+    let open Html in
+    let roles =
+      List.find_map t.roles ~f:(fun (n, r) ->
+          if Role.equal role r then Some (Int.to_string n) else None)
+      |> Option.value ~default:"0"
+    in
+    let role_str = Role.to_string role in
+    div []
+      [
+        label [ ("for", role_str) ] [ text (role_str ^ ": ") ];
+        ( if is_admin then
+          input
+            [
+              ("type", "number");
+              ("id", role_str);
+              ("value", roles);
+              ("onchange", "changeNumberedRole('" ^ role_str ^ "')");
+            ]
+            []
+        else text roles );
+      ]
+
+  let single_select t role ~is_admin =
+    let open Html in
+    let roles =
+      List.find t.roles ~f:(fun (n, r) -> Role.equal role r && n > 0)
+    in
+    let role_str = Role.to_string role in
+    let checked = Option.is_some roles in
+    div []
+      [
+        label [ ("for", role_str) ] [ text (role_str ^ ":  ") ];
+        ( if is_admin then
+          input
+            ( [
+                ("id", role_str);
+                ("onchange", "changeSingleRole('" ^ role_str ^ "')");
+                ("type", "checkbox");
+              ]
+            @ if checked then [ ("checked", "") ] else [] )
+            []
+        else text (if checked then "[x]" else "[ ]") );
+      ]
 
   let role_input t role ~is_admin =
-    let open Html in
     match role with
-    | Role.Werewolf ->
-        let werewolves =
-          List.find_map t.roles ~f:(fun (n, role) ->
-              if Role.equal Werewolf role then Some (Int.to_string n) else None)
-          |> Option.value ~default:"0"
-        in
-        div []
-          [
-            label [ ("for", "werewolves") ] [ text "Werewolves: " ];
-            ( if is_admin then
-              input
-                [
-                  ("type", "number");
-                  ("id", "werewolves");
-                  ("value", werewolves);
-                  ("onchange", "changeWerewolf()");
-                ]
-                []
-            else text werewolves );
-          ]
-    | Robber ->
-        let robber =
-          List.find t.roles ~f:(fun (n, role) ->
-              Role.equal Robber role && n > 0)
-        in
-        let checked = Option.is_some robber in
-        div []
-          [
-            label [ ("for", "robber") ] [ text "Robber:  " ];
-            ( if is_admin then
-              input
-                ( [
-                    ("id", "robber");
-                    ("onchange", "changeRobber()");
-                    ("type", "checkbox");
-                  ]
-                @ if checked then [ ("checked", "") ] else [] )
-                []
-            else text (if checked then "[x]" else "[ ]") );
-          ]
+    | Role.Werewolf | Villager | Insomniac | Mason | Seer ->
+        number_select t role ~is_admin
+    | Robber | Troublemaker -> single_select t role ~is_admin
 
   let get_page t user =
     let html =
@@ -150,9 +157,12 @@ end
 
 type status = No_game | Setup of Setup.t | Play of Werewolf.t
 
-type t = { mutable status : status }
+type t = {
+  mutable status : status;
+  mutable last_game_roles : (int * Role.t) list;
+}
 
-let create () = { status = No_game }
+let create () = { status = No_game; last_game_roles = [] }
 
 let page t username =
   match (t.status, username) with
@@ -169,7 +179,7 @@ let page t username =
 let action t action username =
   match (t.status, action) with
   | No_game, Action.Create_game ->
-      let setup = Setup.create () in
+      let setup = Setup.create ~roles:t.last_game_roles in
       let (_ : unit Or_error.t) = Setup.add_user setup username in
       t.status <- Setup setup
   | Setup _, Create_game -> ()
@@ -178,6 +188,7 @@ let action t action username =
       ()
   | Setup setup, Set_role (role, count) -> Setup.set_role setup role count
   | Setup setup, Start_game -> (
+      t.last_game_roles <- setup.roles;
       let roles =
         List.concat_map setup.roles ~f:(fun (n, role) ->
             List.init n ~f:(fun _ -> role))

@@ -15,7 +15,16 @@ module Query = struct
     | File of string
 
   let available_files =
-    [ "script.js"; "images/werewolves.png"; "images/robbers.png" ]
+    [
+      "script.js";
+      "images/werewolves.png";
+      "images/robbers.png";
+      "images/seers.png";
+      "images/troublemakers.png";
+      "images/villagers.png";
+      "images/insomniacs.png";
+      "images/masons.png";
+    ]
     |> String.Set.of_list
 
   let get_username uri = Uri.get_query_param uri "username"
@@ -45,10 +54,16 @@ module Query = struct
     | "/action/input/ack" ->
         let%map username = get_username uri in
         Action { username; action = Game_input Ack }
-    | "/action/input/choose_user" ->
+    | "/action/input/choose_user" -> (
         let%bind username = get_username uri in
         let%map users = Uri.get_query_param' uri "users" in
-        Action { username; action = Game_input (Choose_user users) }
+        match users with
+        | [ "center__cards__" ] ->
+            Action { username; action = Game_input View_center_cards }
+        | _ -> Action { username; action = Game_input (Choose_user users) } )
+    | "/action/input/reveal" ->
+        let%map username = get_username uri in
+        Action { username; action = Game_input Reveal }
     | "/action/start_game" ->
         let%map username = get_username uri in
         Action { username; action = Start_game }
