@@ -18,15 +18,13 @@ end
 module Join = struct
   let create_game =
     Html.div
-      [ ("style", "text-align:center;") ]
-      [
-        Html.button [ ("onclick", "createGame()") ] [ Html.text "Create Game" ];
-      ]
+      [ ("id", "button"); ("onclick", "createGame()") ]
+      [ Html.text "START" ]
 
   let join_game =
     Html.div
-      [ ("style", "text-align:center;") ]
-      [ Html.button [ ("onclick", "joinGame()") ] [ Html.text "Join Game" ] ]
+      [ ("id", "button"); ("onclick", "joinGame()") ]
+      [ Html.text "START" ]
 
   let get_page ~existing_game ~username =
     let username = Option.value ~default:"" username in
@@ -34,7 +32,7 @@ module Join = struct
       Html.(
         div []
           [
-            text "Username: ";
+            text "NAME: ";
             input
               [ ("type", "text"); ("id", "username"); ("value", username) ]
               [];
@@ -87,14 +85,19 @@ module Setup = struct
       [
         label [ ("for", role_str) ] [ text (role_str ^ ":  ") ];
         ( if is_admin then
-          input
-            ( [
-                ("id", role_str);
-                ("onchange", "changeSingleRole('" ^ role_str ^ "')");
-                ("type", "checkbox");
-              ]
-            @ if checked then [ ("checked", "") ] else [] )
-            []
+          label [ ("class", "switch") ]
+            [
+              input
+                ( [
+                    ("type", "checkbox");
+                    ("id", role_str);
+                    ("onchange", "changeSingleRole('" ^ role_str ^ "')");
+                    ("type", "checkbox");
+                  ]
+                @ if checked then [ ("checked", "") ] else [] )
+                [];
+              span [ ("class", "slider round") ] [];
+            ]
         else text (if checked then "[x]" else "[ ]") );
       ]
 
@@ -133,7 +136,11 @@ module Setup = struct
           ( if is_admin then
             div
               [ ("style", "text-align:center") ]
-              [ button [ ("onclick", "startGame()") ] [ text "Start Game" ] ]
+              [
+                div
+                  [ ("id", "button"); ("onclick", "startGame()") ]
+                  [ text "Start Game" ];
+              ]
           else refresh_page );
         ]
     in

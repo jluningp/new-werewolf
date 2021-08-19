@@ -88,16 +88,24 @@ module Page = struct
                 br;
                 div
                   [ ("style", "text-align:center;") ]
-                  [ button [ ("onclick", "chooseUsers()") ] [ text "GO" ] ];
+                  [
+                    div
+                      [ ("id", "button"); ("onclick", "chooseUsers()") ]
+                      [ text "GO" ];
+                  ];
               ] )
       | Ack_button ->
           div
             [ ("style", "text-align:center;") ]
-            [ button [ ("onclick", "ack()") ] [ text "OK" ] ]
+            [ div [ ("id", "button"); ("onclick", "ack()") ] [ text "OK" ] ]
       | Reveal_button ->
           div
             [ ("style", "text-align:center;") ]
-            [ button [ ("onclick", "reveal()") ] [ text "Reveal Cards" ] ]
+            [
+              div
+                [ ("id", "button"); ("onclick", "reveal()") ]
+                [ text "Reveal Cards" ];
+            ]
       | No_refresh -> div [] []
   end
 
