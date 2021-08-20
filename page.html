@@ -49,6 +49,10 @@
 	  font-size:100%;
       }
 
+      input[disabled] {
+	  background-color:#bdbdbd;
+      }
+
       /* Chrome, Safari, Edge, Opera */
       input::-webkit-outer-spin-button,
       input::-webkit-inner-spin-button {
@@ -100,6 +104,15 @@
 
       input:checked + .slider {
 	  background-color: #2196F3;
+      }
+
+      input[disabled] + .slider {
+	  background-color: gray;
+      }
+
+      input[disabled][checked] + .slider {
+	  background-color: #42667d
+;
       }
 
       input:focus + .slider {
