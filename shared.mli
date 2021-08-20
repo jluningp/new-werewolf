@@ -22,6 +22,7 @@ module Page : sig
   module Element : sig
     type t =
       | Text of string
+      | Centered_text of string
       | Cards of Role.t list
       | Choose_user of {
           choose_this_many : int;

@@ -93,7 +93,7 @@ let get_page_for_insomniac _t (user : User.t) =
   match user.inputs with
   | [ Ack ] ->
       [
-        Page.Element.Text "Your role is";
+        Page.Element.Centered_text "Your card now";
         Cards [ user.current_role ];
         Ack_button;
       ]
@@ -183,7 +183,7 @@ let get_page_for_robber t (user : User.t) =
           { choose_this_many = 1; users = other_users; or_center = false };
       ]
   | [ Choose_user [ _ ]; Ack ] ->
-      [ Text "Your new card"; Cards [ user.current_role ]; Ack_button ]
+      [ Centered_text "Your new card"; Cards [ user.current_role ]; Ack_button ]
   | [ Ack; Choose_user _; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game" ]
 
@@ -226,7 +226,7 @@ let get_page_for_user t (user : User.t) =
       | Some Ack -> [ Page.Element.Text "Waiting" ]
       | _ ->
           [
-            Page.Element.Text "This is your card";
+            Page.Element.Centered_text "Your card";
             Cards [ user.original_role ];
             Ack_button;
           ] )
