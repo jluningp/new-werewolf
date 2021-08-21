@@ -15,17 +15,8 @@ module Query = struct
     | File of string
 
   let available_files =
-    [
-      "script.js";
-      "images/werewolves.png";
-      "images/robbers.png";
-      "images/seers.png";
-      "images/troublemakers.png";
-      "images/villagers.png";
-      "images/insomniacs.png";
-      "images/masons.png";
-    ]
-    |> String.Set.of_list
+    let images = List.map Role.all ~f:Role.card_image in
+    [ "script.js" ] @ images |> String.Set.of_list
 
   let get_username uri = Uri.get_query_param uri "username"
 
@@ -62,9 +53,7 @@ module Query = struct
             Action { username; action = Game_input View_center_cards }
         | _ -> Action { username; action = Game_input (Choose_user users) } )
     | "/action/input/vote" ->
-        Async.Log.Global.error_s [%message "Got vote"];
         let%map username = get_username uri in
-        Async.Log.Global.error_s [%message "Got vote from" (username : string)];
         Action { username; action = Game_input Vote }
     | "/action/start_game" ->
         let%map username = get_username uri in

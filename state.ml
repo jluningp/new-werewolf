@@ -101,9 +101,9 @@ module Setup = struct
 
   let role_input t role ~is_admin =
     match role with
-    | Role.Werewolf | Villager | Insomniac | Mason | Seer ->
+    | Role.Werewolf | Villager | Insomniac | Mason | Seer | Tanner | Minion ->
         number_select t role ~is_admin
-    | Robber | Troublemaker -> single_select t role ~is_admin
+    | Robber | Troublemaker | Drunk -> single_select t role ~is_admin
 
   let get_page t user =
     let html =
@@ -198,11 +198,7 @@ let action t action username =
       | Error _ -> ()
       | Ok werewolf -> t.status <- Play werewolf )
   | Play werewolf, Game_input input ->
-      let (err : unit Or_error.t) = Werewolf.on_input werewolf username input in
-      ( match err with
-      | Ok () -> ()
-      | Error err ->
-          Async.Log.Global.error_s [%message "Got error" (err : Error.t)] );
+      let (_ : unit Or_error.t) = Werewolf.on_input werewolf username input in
       ()
   | _, End_game -> t.status <- No_game
   | _ -> ()

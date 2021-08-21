@@ -11,7 +11,12 @@ module Role : sig
     | Villager
     | Insomniac
     | Mason
+    | Tanner
+    | Minion
+    | Drunk
   [@@deriving sexp, equal, enumerate]
+
+  val card_image : t -> string
 
   val to_string : t -> string
 

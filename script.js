@@ -5,6 +5,7 @@ function get(url, f)
     xmlHttp.onreadystatechange = function() { 
         if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
             f (xmlHttp.responseText);
+	
     }
     xmlHttp.open("GET", url, true); 
     xmlHttp.send(null);
@@ -82,21 +83,23 @@ function ack () {
     get("action/input/ack?" + usernameQuery(), getUpdatedPage);
 } 
 
-function reveal () {
-    get("action/input/reveal?" + usernameQuery(), getUpdatedPage);
+function vote () {
+    get("action/input/vote?" + usernameQuery(), getUpdatedPage);
 } 
+
+function doNothing (str) { }
 
 function changeNumberedRole (role) {
     var count = document.getElementById(role).value;
     if (!(isNaN(count))) {
-	get("action/set_role?role=" + role + "&count=" + count + "&" + usernameQuery(), getUpdatedPage);
+	get("action/set_role?role=" + role + "&count=" + count + "&" + usernameQuery(), doNothing);
     }
 } 
 
 function changeSingleRole (role) {
     var role_checked = document.getElementById(role).checked;
     var count = role_checked ? "1" : "0";
-    get("action/set_role?role=" + role + "&count=" + count + "&" + usernameQuery(), getUpdatedPage);
+    get("action/set_role?role=" + role + "&count=" + count + "&" + usernameQuery(), doNothing);
 }    
 
 function getSelectedUsers () {
