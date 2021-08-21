@@ -11,7 +11,12 @@ module Role : sig
     | Villager
     | Insomniac
     | Mason
+    | Tanner
+    | Minion
+    | Drunk
   [@@deriving sexp, equal, enumerate]
+
+  val card_image : t -> string
 
   val to_string : t -> string
 
@@ -30,7 +35,7 @@ module Page : sig
           or_center : bool;
         }
       | Ack_button
-      | Reveal_button
+      | Vote_button
       | No_refresh
   end
 
@@ -40,6 +45,6 @@ module Page : sig
 end
 
 module Input : sig
-  type t = Ack | Choose_user of Username.t list | View_center_cards | Reveal
+  type t = Ack | Choose_user of Username.t list | View_center_cards | Vote
   [@@deriving sexp]
 end
