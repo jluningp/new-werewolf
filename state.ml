@@ -115,6 +115,7 @@ module Setup = struct
       in
       let inputs = List.map Role.all ~f:(role_input t ~is_admin) in
       let players = String.concat ~sep:", " t.users in
+      let refresh = if is_admin then " (&#8635; page to update)" else "" in
       div []
         [
           div [ ("style", "text-align:center") ] [ b [] [ text "New Game" ] ];
@@ -125,7 +126,7 @@ module Setup = struct
           div [ ("style", "padding-left:0.3em") ] inputs;
           div
             [ ("style", "font-size:.7em; color:gray;") ]
-            [ br; text ("Players: " ^ players) ];
+            [ br; text ("Players" ^ refresh ^ ": " ^ players) ];
           ( if is_admin then
             div
               [ ("style", "text-align:center") ]
@@ -197,7 +198,11 @@ let action t action username =
       | Error _ -> ()
       | Ok werewolf -> t.status <- Play werewolf )
   | Play werewolf, Game_input input ->
-      let (_ : unit Or_error.t) = Werewolf.on_input werewolf username input in
+      let (err : unit Or_error.t) = Werewolf.on_input werewolf username input in
+      ( match err with
+      | Ok () -> ()
+      | Error err ->
+          Async.Log.Global.error_s [%message "Got error" (err : Error.t)] );
       ()
   | _, End_game -> t.status <- No_game
   | _ -> ()

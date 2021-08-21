@@ -30,12 +30,12 @@ module Page = struct
           or_center : bool;
         }
       | Ack_button
-      | Reveal_button
+      | Vote_button
       | No_refresh
 
     let is_action = function
-      | Text _ | Centered_text _ | Cards _ | Reveal_button -> false
-      | Choose_user _ | Ack_button | No_refresh -> true
+      | Text _ | Centered_text _ | Cards _ -> false
+      | Choose_user _ | Ack_button | Vote_button | No_refresh -> true
 
     let card_image role =
       match role with
@@ -109,13 +109,13 @@ module Page = struct
           div
             [ ("style", "text-align:center;") ]
             [ div [ ("id", "button"); ("onclick", "ack()") ] [ text "OK" ] ]
-      | Reveal_button ->
+      | Vote_button ->
           div
             [ ("style", "text-align:center;") ]
             [
               div
-                [ ("id", "button"); ("onclick", "reveal()") ]
-                [ text "Reveal Cards" ];
+                [ ("id", "button"); ("onclick", "vote()") ]
+                [ text "Ready to Vote" ];
             ]
       | No_refresh -> div [] []
   end
@@ -131,6 +131,6 @@ module Page = struct
 end
 
 module Input = struct
-  type t = Ack | Choose_user of Username.t list | View_center_cards | Reveal
+  type t = Ack | Choose_user of Username.t list | View_center_cards | Vote
   [@@deriving sexp]
 end

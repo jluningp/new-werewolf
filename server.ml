@@ -61,9 +61,11 @@ module Query = struct
         | [ "center__cards__" ] ->
             Action { username; action = Game_input View_center_cards }
         | _ -> Action { username; action = Game_input (Choose_user users) } )
-    | "/action/input/reveal" ->
+    | "/action/input/vote" ->
+        Async.Log.Global.error_s [%message "Got vote"];
         let%map username = get_username uri in
-        Action { username; action = Game_input Reveal }
+        Async.Log.Global.error_s [%message "Got vote from" (username : string)];
+        Action { username; action = Game_input Vote }
     | "/action/start_game" ->
         let%map username = get_username uri in
         Action { username; action = Start_game }

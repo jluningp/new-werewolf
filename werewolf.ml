@@ -244,41 +244,100 @@ let get_page_for_user t (user : User.t) =
             Cards [ user.original_role ];
             Ack_button;
           ] )
-  | Day ->
-      let night_actions =
-        [
-          Page.Element.Text "During the night you:";
+  | Day -> (
+      match user.inputs with
+      | Vote :: _ -> [ Page.Element.Text "Waiting" ]
+      | _ ->
+          let night_actions =
+            [
+              Page.Element.Text "During the night you:";
+              Text
+                (Html.to_string
+                   (Html.ul []
+                      (List.map user.actions ~f:(fun str ->
+                           Html.li [] [ Html.text str ]))));
+            ]
+          in
+          night_actions
+          @ [
+              Text "<hr></hr>";
+              Text
+                "Discuss. When you are ready to vote, hit the \"Ready to \
+                 Vote\" button.";
+              Vote_button;
+            ] )
+  | Vote -> (
+      match user.inputs with
+      | Choose_user [ _ ] :: _ -> [ Text "Waiting" ]
+      | _ ->
+          [
+            Page.Element.Text "Vote:";
+            Choose_user
+              {
+                choose_this_many = 1;
+                users = Hashtbl.keys t.users;
+                or_center = false;
+              };
+          ] )
+  | Results ->
+      let votes =
+        Hashtbl.data t.users
+        |> List.filter_map ~f:(fun user ->
+               match user.inputs with
+               | Choose_user [ username ] :: _ -> Some username
+               | _ -> None)
+        |> List.sort ~compare:String.compare
+        |> List.group ~break:(fun s1 s2 -> not (String.equal s1 s2))
+        |> List.map ~f:(fun l -> (List.hd_exn l, List.length l))
+        |> List.sort ~compare:(fun (_, n1) (_, n2) -> Int.compare n2 n1)
+      in
+      let loser, losing_votes = List.hd_exn votes in
+      let loser = Hashtbl.find_exn t.users loser in
+      let other_votes =
+        match votes with
+        | [] | [ _ ] -> []
+        | _ :: votes ->
+            let users =
+              List.map votes ~f:(fun (u, n) -> (Hashtbl.find_exn t.users u, n))
+            in
+            [
+              Page.Element.Text "<hr></hr>";
+              Text "Other players that received votes:";
+              Text
+                (Html.to_string
+                   (Html.ul []
+                      (List.map users ~f:(fun (user, votes) ->
+                           Html.li []
+                             [
+                               Html.text
+                                 (sprintf !"%s (%{Role}): %n vote%s"
+                                    user.username user.current_role votes
+                                    (if votes = 1 then "" else "s"));
+                             ]))));
+            ]
+      in
+      [
+        Page.Element.Centered_text
+          (sprintf
+             !"%s (the %{Role}) received the most votes (%n)."
+             loser.username loser.current_role losing_votes);
+      ]
+      @ other_votes
+      @ [
+          Text "<hr></hr>";
+          Text "In the end, your cards were:";
           Text
             (Html.to_string
                (Html.ul []
-                  (List.map user.actions ~f:(fun str ->
-                       Html.li [] [ Html.text str ]))));
+                  (List.map (Hashtbl.data t.users) ~f:(fun user ->
+                       Html.li []
+                         [
+                           Html.text
+                             (sprintf !"%s: %{Role}" user.username
+                                user.current_role);
+                         ]))));
+          No_refresh;
         ]
-      in
-      night_actions
-      @ [
-          Text "<hr></hr>";
-          Text
-            "Discuss and vote. Once you have voted, hit the \"Reveal Cards\" \
-             button.";
-          Reveal_button;
-        ]
-  | Vote -> [ Text "Not yet supported" ]
-  | Results ->
-      [
-        Page.Element.Text "In the end, your cards were:";
-        Text
-          (Html.to_string
-             (Html.ul []
-                (List.map (Hashtbl.data t.users) ~f:(fun user ->
-                     Html.li []
-                       [
-                         Html.text
-                           (sprintf !"%s: %{Role}" user.username
-                              user.current_role);
-                       ]))));
-        No_refresh;
-      ]
   | Night night_phase -> (
       if not (is_users_turn night_phase user) then [ Text "Waiting" ]
       else
@@ -293,8 +352,12 @@ let get_page_for_user t (user : User.t) =
 
 let validate_input t (user : User.t) (input : Input.t) =
   match t.phase with
-  | Day -> ( match input with Reveal -> true | _ -> false )
-  | Vote | Results -> false
+  | Day -> ( match input with Vote -> true | _ -> false )
+  | Vote -> (
+      match input with
+      | Choose_user [ user ] -> Hashtbl.mem t.users user
+      | _ -> false )
+  | Results -> false
   | View_roles -> (
       match (List.hd user.inputs, input) with None, Ack -> true | _ -> false )
   | Night phase -> (
@@ -452,13 +515,22 @@ let rec maybe_change_phase t =
         maybe_change_phase t )
   | Day ->
       let phase_over =
-        Hashtbl.exists t.users ~f:(fun user ->
-            List.exists user.inputs ~f:(function Reveal -> true | _ -> false))
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.inputs with Vote :: _ -> true | _ -> false)
+      in
+
+      if phase_over then (
+        t.phase <- Vote;
+        maybe_change_phase t )
+  | Vote ->
+      let phase_over =
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.inputs with Choose_user [ _ ] :: _ -> true | _ -> false)
       in
       if phase_over then (
         t.phase <- Results;
         maybe_change_phase t )
-  | Vote | Results -> ()
+  | Results -> ()
   | Night Viewer ->
       let phase_over =
         Hashtbl.filter t.users ~f:(fun user ->
@@ -513,36 +585,39 @@ let on_input t username input =
       if validate_input t user input then (
         record_action t user input;
         user.inputs <- input :: user.inputs;
-        ( match user.original_role with
-        | Robber -> (
-            match input with
-            | Ack -> ()
-            | Choose_user [ username ] -> (
-                match Hashtbl.find t.users username with
-                | None -> assert false
-                | Some other_user ->
-                    let other_role = other_user.current_role in
-                    other_user.current_role <- user.current_role;
-                    user.current_role <- other_role )
-            | _ -> assert false )
-        | Troublemaker -> (
-            match input with
-            | Ack -> ()
-            | Choose_user [ user1; user2 ] -> (
-                match
-                  (Hashtbl.find t.users user1, Hashtbl.find t.users user2)
-                with
-                | None, _ | _, None -> assert false
-                | Some user1, Some user2 ->
-                    let role1 = user1.current_role in
-                    user1.current_role <- user2.current_role;
-                    user2.current_role <- role1 )
-            | _ -> assert false )
-        | Werewolf -> ()
-        | Mason -> ()
-        | Seer -> ()
-        | Insomniac -> ()
-        | Villager -> () );
+        ( match t.phase with
+        | Night _ -> (
+            match user.original_role with
+            | Robber -> (
+                match input with
+                | Ack -> ()
+                | Choose_user [ username ] -> (
+                    match Hashtbl.find t.users username with
+                    | None -> assert false
+                    | Some other_user ->
+                        let other_role = other_user.current_role in
+                        other_user.current_role <- user.current_role;
+                        user.current_role <- other_role )
+                | _ -> assert false )
+            | Troublemaker -> (
+                match input with
+                | Ack -> ()
+                | Choose_user [ user1; user2 ] -> (
+                    match
+                      (Hashtbl.find t.users user1, Hashtbl.find t.users user2)
+                    with
+                    | None, _ | _, None -> assert false
+                    | Some user1, Some user2 ->
+                        let role1 = user1.current_role in
+                        user1.current_role <- user2.current_role;
+                        user2.current_role <- role1 )
+                | _ -> assert false )
+            | Werewolf -> ()
+            | Mason -> ()
+            | Seer -> ()
+            | Insomniac -> ()
+            | Villager -> () )
+        | _ -> () );
         maybe_change_phase t;
         Ok () )
       else Or_error.error_string "Invalid input"
