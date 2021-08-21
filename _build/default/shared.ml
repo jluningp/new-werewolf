@@ -22,6 +22,7 @@ module Page = struct
   module Element = struct
     type t =
       | Text of string
+      | Centered_text of string
       | Cards of Role.t list
       | Choose_user of {
           choose_this_many : int;
@@ -33,7 +34,7 @@ module Page = struct
       | No_refresh
 
     let is_action = function
-      | Text _ | Cards _ | Reveal_button -> false
+      | Text _ | Centered_text _ | Cards _ | Reveal_button -> false
       | Choose_user _ | Ack_button | No_refresh -> true
 
     let card_image role =
@@ -50,13 +51,18 @@ module Page = struct
       let open Html in
       match element with
       | Text str -> p [] [ text str ]
+      | Centered_text str ->
+          div [ ("style", "text-align:center;") ] [ text str ]
       | Cards [] -> p [] [ text "No Cards" ]
-      | Cards [ card ] -> img [ ("src", card_image card) ] []
+      | Cards [ card ] ->
+          div
+            [ ("style", "text-align:center;") ]
+            [ img [ ("src", card_image card) ] [] ]
       | Cards cards ->
           let cards =
             List.map cards ~f:(fun card -> img [ ("src", card_image card) ] [])
           in
-          div [] cards
+          div [ ("style", "text-align:center;") ] [ div [] cards ]
       | Choose_user { choose_this_many; users; or_center } ->
           let users = if or_center then "center__cards__" :: users else users in
           let user_select =
@@ -70,15 +76,20 @@ module Page = struct
                   if choose_this_many = 1 then "radio" else "checkbox"
                 in
                 [
-                  input
+                  label [ ("class", "switch") ]
                     [
-                      ("type", typ);
-                      ("name", "users");
-                      ("id", "select" ^ user);
-                      ("value", user);
-                    ]
-                    [];
-                  label [ ("for", "select" ^ user) ] [ text username ];
+                      input
+                        [
+                          ("type", typ);
+                          ("name", "users");
+                          ("id", "select" ^ user);
+                          ("value", user);
+                        ]
+                        [];
+                      span [ ("class", "slider round") ] [];
+                    ];
+                  label [ ("for", "select" ^ user) ] [ text ("  " ^ username) ];
+                  br;
                   br;
                 ])
           in

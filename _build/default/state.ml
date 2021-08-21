@@ -62,16 +62,15 @@ module Setup = struct
     div []
       [
         label [ ("for", role_str) ] [ text (role_str ^ ": ") ];
-        ( if is_admin then
-          input
-            [
+        input
+          ( [
               ("type", "number");
               ("id", role_str);
               ("value", roles);
               ("onchange", "changeNumberedRole('" ^ role_str ^ "')");
             ]
-            []
-        else text roles );
+          @ if is_admin then [] else [ ("disabled", "") ] )
+          [];
       ]
 
   let single_select t role ~is_admin =
@@ -84,21 +83,20 @@ module Setup = struct
     div []
       [
         label [ ("for", role_str) ] [ text (role_str ^ ":  ") ];
-        ( if is_admin then
-          label [ ("class", "switch") ]
-            [
-              input
-                ( [
-                    ("type", "checkbox");
-                    ("id", role_str);
-                    ("onchange", "changeSingleRole('" ^ role_str ^ "')");
-                    ("type", "checkbox");
-                  ]
-                @ if checked then [ ("checked", "") ] else [] )
-                [];
-              span [ ("class", "slider round") ] [];
-            ]
-        else text (if checked then "[x]" else "[ ]") );
+        label [ ("class", "switch") ]
+          [
+            input
+              ( [
+                  ("type", "checkbox");
+                  ("id", role_str);
+                  ("onchange", "changeSingleRole('" ^ role_str ^ "')");
+                  ("type", "checkbox");
+                ]
+              @ (if is_admin then [] else [ ("disabled", "") ])
+              @ if checked then [ ("checked", "") ] else [] )
+              [];
+            span [ ("class", "slider round") ] [];
+          ];
       ]
 
   let role_input t role ~is_admin =
@@ -121,18 +119,13 @@ module Setup = struct
         [
           div [ ("style", "text-align:center") ] [ b [] [ text "New Game" ] ];
           br;
-          br;
-          text
-            ( "Players: " ^ players
-            ^ if is_admin then "           (refresh to see new players)" else ""
-            );
-          br;
-          br;
           ( if is_admin then text "Select 3 more roles than players:"
           else text "Selecting roles:" );
           br;
           div [ ("style", "padding-left:0.3em") ] inputs;
-          br;
+          div
+            [ ("style", "font-size:.7em; color:gray;") ]
+            [ br; text ("Players: " ^ players) ];
           ( if is_admin then
             div
               [ ("style", "text-align:center") ]

@@ -31,10 +31,20 @@ module User = struct
     mutable inputs : Input.t list;
     original_role : Role.t;
     mutable current_role : Role.t;
+    mutable actions : string list;
   }
 
   let create username role =
-    { username; inputs = []; original_role = role; current_role = role }
+    {
+      username;
+      inputs = [];
+      original_role = role;
+      current_role = role;
+      actions = [];
+    }
+
+  let record_action t action =
+    ksprintf (fun action -> t.actions <- t.actions @ [ action ]) action
 end
 
 type t = {
@@ -93,7 +103,7 @@ let get_page_for_insomniac _t (user : User.t) =
   match user.inputs with
   | [ Ack ] ->
       [
-        Page.Element.Text "Your role is";
+        Page.Element.Centered_text "Your card now";
         Cards [ user.current_role ];
         Ack_button;
       ]
@@ -183,34 +193,38 @@ let get_page_for_robber t (user : User.t) =
           { choose_this_many = 1; users = other_users; or_center = false };
       ]
   | [ Choose_user [ _ ]; Ack ] ->
-      [ Text "Your new card"; Cards [ user.current_role ]; Ack_button ]
+      [ Centered_text "Your new card"; Cards [ user.current_role ]; Ack_button ]
   | [ Ack; Choose_user _; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game" ]
+
+let what_werewolf_sees t (user : User.t) =
+  let other_werewolves =
+    Hashtbl.filter t.users ~f:(fun other_user ->
+        match other_user.original_role with
+        | Role.Werewolf ->
+            not (Username.equal other_user.username user.username)
+        | _ -> false)
+    |> Hashtbl.keys
+  in
+  match other_werewolves with
+  | [] ->
+      let card = t.random_cache.werewolf_sees_card in
+      let center_cards = List.filteri t.center_cards ~f:(fun i _ -> i = card) in
+      `Center_cards center_cards
+  | werewolves -> `Other_werewolves werewolves
 
 let get_page_for_werewolf t (user : User.t) =
   match user.inputs with
   | [ Ack ] -> (
-      let other_werewolves =
-        Hashtbl.filter t.users ~f:(fun other_user ->
-            match other_user.original_role with
-            | Role.Werewolf ->
-                not (Username.equal other_user.username user.username)
-            | _ -> false)
-        |> Hashtbl.keys
-      in
-      match other_werewolves with
-      | [] ->
-          let card = t.random_cache.werewolf_sees_card in
-          let center_cards =
-            List.filteri t.center_cards ~f:(fun i _ -> i = card)
-          in
+      match what_werewolf_sees t user with
+      | `Center_cards center_cards ->
           [
             Page.Element.Text
               "There are no other werewolves. Card from the center:";
             Cards center_cards;
             Ack_button;
           ]
-      | _ :: _ ->
+      | `Other_werewolves other_werewolves ->
           [
             Text "These are the other werewolves";
             Text (String.concat ~sep:", " other_werewolves);
@@ -226,27 +240,45 @@ let get_page_for_user t (user : User.t) =
       | Some Ack -> [ Page.Element.Text "Waiting" ]
       | _ ->
           [
-            Page.Element.Text "This is your card";
+            Page.Element.Centered_text "Your card";
             Cards [ user.original_role ];
             Ack_button;
           ] )
   | Day ->
-      [
-        Text
-          "Discuss and vote. Once you have voted, hit the \"Reveal Cards\" \
-           button.";
-        Reveal_button;
-      ]
+      let night_actions =
+        [
+          Page.Element.Text "During the night you:";
+          Text
+            (Html.to_string
+               (Html.ul []
+                  (List.map user.actions ~f:(fun str ->
+                       Html.li [] [ Html.text str ]))));
+        ]
+      in
+      night_actions
+      @ [
+          Text "<hr></hr>";
+          Text
+            "Discuss and vote. Once you have voted, hit the \"Reveal Cards\" \
+             button.";
+          Reveal_button;
+        ]
   | Vote -> [ Text "Not yet supported" ]
   | Results ->
-      ( t.users |> Hashtbl.data
-      |> List.concat_map ~f:(fun user ->
-             [
-               Page.Element.Text user.username;
-               Text "New Role";
-               Cards [ user.current_role ];
-             ]) )
-      @ [ No_refresh ]
+      [
+        Page.Element.Text "In the end, your cards were:";
+        Text
+          (Html.to_string
+             (Html.ul []
+                (List.map (Hashtbl.data t.users) ~f:(fun user ->
+                     Html.li []
+                       [
+                         Html.text
+                           (sprintf !"%s: %{Role}" user.username
+                              user.current_role);
+                       ]))));
+        No_refresh;
+      ]
   | Night night_phase -> (
       if not (is_users_turn night_phase user) then [ Text "Waiting" ]
       else
@@ -305,6 +337,107 @@ let validate_input t (user : User.t) (input : Input.t) =
             | _ -> false )
         | Villager -> (
             match (user.inputs, input) with [], Ack -> true | _ -> false ) )
+
+let record_action t (user : User.t) (input : Input.t) =
+  match t.phase with
+  | Day | Vote | Results -> ()
+  | View_roles ->
+      User.record_action user
+        !"Saw that your original card was %{Role}"
+        user.original_role
+  | Night phase -> (
+      if not (is_users_turn phase user) then ()
+      else
+        match user.original_role with
+        | Robber -> (
+            match (user.inputs, input) with
+            | [ Ack ], Choose_user [ username ] ->
+                User.record_action user !"Robbed %s" username
+            | [ Choose_user _; Ack ], Ack ->
+                User.record_action user
+                  !"Saw that your new card was %{Role}"
+                  user.current_role
+            | _ -> () )
+        | Werewolf -> (
+            match (user.inputs, input) with
+            | [ Ack ], Ack -> (
+                match what_werewolf_sees t user with
+                | `Center_cards [ c1 ] ->
+                    User.record_action user
+                      "Saw that you were the lone werewolf.";
+                    User.record_action user !"Saw the %{Role} in the center" c1
+                | `Center_cards _ -> ()
+                | `Other_werewolves werewolves -> (
+                    match werewolves with
+                    | [ u1 ] ->
+                        User.record_action user
+                          "Saw that %s was the other werewolf" u1
+                    | u1 :: users ->
+                        User.record_action user
+                          "Saw that %s and %s were the other werewolves"
+                          (String.concat ~sep:", " users)
+                          u1
+                    | _ -> () ) )
+            | _ -> () )
+        | Seer -> (
+            match (user.inputs, input) with
+            | [ Ack ], Choose_user [ username ] ->
+                User.record_action user "Chose to see %s's card" username
+            | [ Ack ], View_center_cards ->
+                User.record_action user "Chose to view two center cards"
+            | [ Choose_user [ username ]; Ack ], Ack ->
+                User.record_action user
+                  !"Saw that %s's card was %{Role}"
+                  username (Hashtbl.find_exn t.users username).current_role
+            | [ View_center_cards; Ack ], Ack -> (
+                let center_cards =
+                  List.filteri t.center_cards ~f:(fun idx _ ->
+                      t.random_cache.seer_doesnt_see_card <> idx)
+                in
+                match center_cards with
+                | [ c1; c2 ] ->
+                    User.record_action user
+                      !"Saw two of the center cards: %{Role} and %{Role}"
+                      c1 c2
+                | _ -> () )
+            | _ -> () )
+        | Troublemaker -> (
+            match (user.inputs, input) with
+            | [ Ack ], Choose_user [ user1; user2 ] ->
+                User.record_action user !"Swapped %s and %s" user1 user2
+            | _ -> () )
+        | Mason -> (
+            match (user.inputs, input) with
+            | [ Ack ], Ack -> (
+                let other_masons =
+                  Hashtbl.filter t.users ~f:(fun other_user ->
+                      match other_user.original_role with
+                      | Role.Mason ->
+                          not (Username.equal other_user.username user.username)
+                      | _ -> false)
+                  |> Hashtbl.keys
+                in
+                match other_masons with
+                | [] ->
+                    User.record_action user
+                      "Saw that there were no other masons"
+                | [ mason ] ->
+                    User.record_action user "Saw that the other mason was %s"
+                      mason
+                | m1 :: ms ->
+                    User.record_action user
+                      "Saw that the other masons were %s and %s"
+                      (String.concat ms ~sep:", ")
+                      m1 )
+            | _ -> () )
+        | Insomniac -> (
+            match (user.inputs, input) with
+            | [ Ack ], Ack ->
+                User.record_action user
+                  !"Saw that your card was now %{Role}"
+                  user.current_role
+            | _ -> () )
+        | Villager -> () )
 
 let rec maybe_change_phase t =
   match t.phase with
@@ -378,6 +511,7 @@ let on_input t username input =
   | None -> Or_error.error_string "Unknown user"
   | Some user ->
       if validate_input t user input then (
+        record_action t user input;
         user.inputs <- input :: user.inputs;
         ( match user.original_role with
         | Robber -> (
