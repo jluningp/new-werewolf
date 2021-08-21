@@ -73,7 +73,7 @@ module Page = struct
       | Choose_user { choose_this_many; users; or_center } ->
           let users = if or_center then "center__cards__" :: users else users in
           let user_select =
-            List.concat_map users ~f:(fun user ->
+            List.map users ~f:(fun user ->
                 let username =
                   match user with
                   | "center__cards__" -> "center cards"
@@ -96,14 +96,13 @@ module Page = struct
                       span [ ("class", "slider round") ] [];
                     ];
                   label [ ("for", "select" ^ user) ] [ text ("  " ^ username) ];
-                  br;
-                  br;
                 ])
+            |> List.intersperse ~sep:[ br; br ]
+            |> List.concat
           in
           div []
             ( user_select
             @ [
-                br;
                 div
                   [ ("style", "text-align:center;") ]
                   [
