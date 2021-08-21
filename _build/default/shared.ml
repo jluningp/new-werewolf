@@ -11,7 +11,23 @@ module Role = struct
     | Villager
     | Insomniac
     | Mason
+    | Tanner
+    | Minion
+    | Drunk
   [@@deriving sexp, equal, enumerate]
+
+  let card_image role =
+    match role with
+    | Werewolf -> "images/werewolves.png"
+    | Robber -> "images/robbers.png"
+    | Seer -> "images/seers.png"
+    | Troublemaker -> "images/troublemakers.png"
+    | Villager -> "images/villagers.png"
+    | Insomniac -> "images/insomniacs.png"
+    | Mason -> "images/masons.png"
+    | Minion -> "images/minions.png"
+    | Drunk -> "images/drunks.png"
+    | Tanner -> "images/tanners.png"
 
   let of_string str = t_of_sexp (Sexp.of_string str)
 
@@ -30,22 +46,12 @@ module Page = struct
           or_center : bool;
         }
       | Ack_button
-      | Reveal_button
+      | Vote_button
       | No_refresh
 
     let is_action = function
-      | Text _ | Centered_text _ | Cards _ | Reveal_button -> false
-      | Choose_user _ | Ack_button | No_refresh -> true
-
-    let card_image role =
-      match role with
-      | Role.Werewolf -> "images/werewolves.png"
-      | Robber -> "images/robbers.png"
-      | Seer -> "images/seers.png"
-      | Troublemaker -> "images/troublemakers.png"
-      | Villager -> "images/villagers.png"
-      | Insomniac -> "images/insomniacs.png"
-      | Mason -> "images/masons.png"
+      | Text _ | Centered_text _ | Cards _ -> false
+      | Choose_user _ | Ack_button | Vote_button | No_refresh -> true
 
     let to_html element =
       let open Html in
@@ -57,10 +63,11 @@ module Page = struct
       | Cards [ card ] ->
           div
             [ ("style", "text-align:center;") ]
-            [ img [ ("src", card_image card) ] [] ]
+            [ img [ ("src", Role.card_image card) ] [] ]
       | Cards cards ->
           let cards =
-            List.map cards ~f:(fun card -> img [ ("src", card_image card) ] [])
+            List.map cards ~f:(fun card ->
+                img [ ("src", Role.card_image card) ] [])
           in
           div [ ("style", "text-align:center;") ] [ div [] cards ]
       | Choose_user { choose_this_many; users; or_center } ->
@@ -109,13 +116,13 @@ module Page = struct
           div
             [ ("style", "text-align:center;") ]
             [ div [ ("id", "button"); ("onclick", "ack()") ] [ text "OK" ] ]
-      | Reveal_button ->
+      | Vote_button ->
           div
             [ ("style", "text-align:center;") ]
             [
               div
-                [ ("id", "button"); ("onclick", "reveal()") ]
-                [ text "Reveal Cards" ];
+                [ ("id", "button"); ("onclick", "vote()") ]
+                [ text "Ready to Vote" ];
             ]
       | No_refresh -> div [] []
   end
@@ -131,6 +138,6 @@ module Page = struct
 end
 
 module Input = struct
-  type t = Ack | Choose_user of Username.t list | View_center_cards | Reveal
+  type t = Ack | Choose_user of Username.t list | View_center_cards | Vote
   [@@deriving sexp]
 end

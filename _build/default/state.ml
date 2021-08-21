@@ -101,9 +101,9 @@ module Setup = struct
 
   let role_input t role ~is_admin =
     match role with
-    | Role.Werewolf | Villager | Insomniac | Mason | Seer ->
+    | Role.Werewolf | Villager | Insomniac | Mason | Seer | Tanner | Minion ->
         number_select t role ~is_admin
-    | Robber | Troublemaker -> single_select t role ~is_admin
+    | Robber | Troublemaker | Drunk -> single_select t role ~is_admin
 
   let get_page t user =
     let html =
@@ -115,6 +115,7 @@ module Setup = struct
       in
       let inputs = List.map Role.all ~f:(role_input t ~is_admin) in
       let players = String.concat ~sep:", " t.users in
+      let refresh = if is_admin then " (&#8635; page to update)" else "" in
       div []
         [
           div [ ("style", "text-align:center") ] [ b [] [ text "New Game" ] ];
@@ -125,7 +126,7 @@ module Setup = struct
           div [ ("style", "padding-left:0.3em") ] inputs;
           div
             [ ("style", "font-size:.7em; color:gray;") ]
-            [ br; text ("Players: " ^ players) ];
+            [ br; text ("Players" ^ refresh ^ ": " ^ players) ];
           ( if is_admin then
             div
               [ ("style", "text-align:center") ]
