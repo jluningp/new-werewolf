@@ -172,10 +172,12 @@ let get_page_for_mason t (user : User.t) =
       | [] -> [ Page.Element.Text "There are no other masons."; Ack_button ]
       | [ mason ] ->
           [ Text (sprintf "The other mason is %s." mason); Ack_button ]
-      | masons ->
+      | m :: masons ->
           [
-            Text "These are the other masons:";
-            Text (String.concat ~sep:", " masons);
+            Text
+              (sprintf "%s and %s are the other masons"
+                 (String.concat ~sep:", " masons)
+                 m);
             Ack_button;
           ] )
   | [ Ack; Ack ] -> [ Text "Waiting" ]
@@ -279,12 +281,22 @@ let get_page_for_minion t (user : User.t) =
   match user.inputs with
   | [ Ack ] -> (
       match what_werewolf_sees t user with
-      | `Other_werewolves other_werewolves ->
-          [
-            Page.Element.Text "These are the werewolves";
-            Text (String.concat ~sep:", " other_werewolves);
-            Ack_button;
-          ]
+      | `Other_werewolves werewolves -> (
+          match werewolves with
+          | [] ->
+              [
+                Page.Element.Text
+                  "An error has occurred. Please start a new game.";
+              ]
+          | [ u1 ] -> [ Text (sprintf "%s is the werewolf" u1); Ack_button ]
+          | u1 :: users ->
+              [
+                Text
+                  (sprintf "%s and %s are the werewolves"
+                     (String.concat ~sep:", " users)
+                     u1);
+                Ack_button;
+              ] )
       | `Center_cards _ -> [ Text "There are no werewolves."; Ack_button ] )
   | [ Ack; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game." ]
@@ -300,12 +312,23 @@ let get_page_for_werewolf t (user : User.t) =
             Cards center_cards;
             Ack_button;
           ]
-      | `Other_werewolves other_werewolves ->
-          [
-            Text "These are the other werewolves";
-            Text (String.concat ~sep:", " other_werewolves);
-            Ack_button;
-          ] )
+      | `Other_werewolves other_werewolves -> (
+          match other_werewolves with
+          | [] ->
+              [
+                Page.Element.Text
+                  "An error has occurred. Please start a new game.";
+              ]
+          | [ u1 ] ->
+              [ Text (sprintf "%s is the other werewolf" u1); Ack_button ]
+          | u1 :: users ->
+              [
+                Text
+                  (sprintf "%s and %s are the other werewolves"
+                     (String.concat ~sep:", " users)
+                     u1);
+                Ack_button;
+              ] ) )
   | [ Ack; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game." ]
 
