@@ -867,9 +867,12 @@ let rec maybe_change_phase t =
             | _ -> false)
         |> Hashtbl.is_empty
       in
-      if phase_over then (
-        t.phase <- Day;
-        maybe_change_phase t )
+      if phase_over then
+        let open Async in
+        don't_wait_for
+          (let%map () = Clock.after (Time.Span.of_int_sec (2 + Random.int 2)) in
+           t.phase <- Day;
+           maybe_change_phase t)
 
 let on_input t username input =
   match Hashtbl.find t.users username with
