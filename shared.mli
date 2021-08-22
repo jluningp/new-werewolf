@@ -14,7 +14,7 @@ module Role : sig
     | Tanner
     | Minion
     | Drunk
-    | Doppleganger of t option
+    | Doppelganger of t option
   [@@deriving sexp, equal, enumerate]
 
   val card_image : t -> string
