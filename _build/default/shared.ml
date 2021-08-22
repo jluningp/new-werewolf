@@ -14,7 +14,7 @@ module Role = struct
     | Tanner
     | Minion
     | Drunk
-    | Doppleganger of t option
+    | Doppelganger of t option
   [@@deriving sexp, equal]
 
   let all =
@@ -29,7 +29,7 @@ module Role = struct
       Tanner;
       Minion;
       Drunk;
-      Doppleganger None;
+      Doppelganger None;
     ]
 
   let card_image role =
@@ -44,16 +44,16 @@ module Role = struct
     | Minion -> "images/minions.png"
     | Drunk -> "images/drunks.png"
     | Tanner -> "images/tanners.png"
-    | Doppleganger _ -> "images/dopplegangers.png"
+    | Doppelganger _ -> "images/doppelgangers.png"
 
   let of_string str =
     match str with
-    | "Doppleganger" -> Doppleganger None
+    | "Doppelganger" -> Doppelganger None
     | _ -> t_of_sexp (Sexp.of_string str)
 
   let to_string t =
     match t with
-    | Doppleganger _ -> "Doppleganger"
+    | Doppelganger _ -> "Doppelganger"
     | _ -> Sexp.to_string (sexp_of_t t)
 end
 

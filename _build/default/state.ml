@@ -113,7 +113,7 @@ module Setup = struct
     match role with
     | Role.Werewolf | Villager | Insomniac | Mason | Seer | Tanner | Minion ->
         number_select t role ~is_admin
-    | Robber | Troublemaker | Drunk | Doppleganger _ ->
+    | Robber | Troublemaker | Drunk | Doppelganger _ ->
         single_select t role ~is_admin
 
   let get_page t user =

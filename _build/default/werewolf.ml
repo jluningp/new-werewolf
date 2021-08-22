@@ -40,11 +40,11 @@ end
 module Phase = struct
   module Night = struct
     type t =
-      | Doppleganger
-      | Doppleganger_seer
-      | Doppleganger_robber
-      | Doppleganger_troublemaker
-      | Doppleganger_drunk
+      | Doppelganger
+      | Doppelganger_seer
+      | Doppelganger_robber
+      | Doppelganger_troublemaker
+      | Doppelganger_drunk
       | Viewer
       | Robber
       | Troublemaker
@@ -132,18 +132,18 @@ let is_users_turn night_phase (user : User.t) =
   match (night_phase, user.original_role) with
   | ( Phase.Night.Viewer,
       ( Werewolf | Seer | Mason | Minion
-      | Doppleganger (Some Werewolf)
-      | Doppleganger (Some Mason)
-      | Doppleganger (Some Minion) ) ) ->
+      | Doppelganger (Some Werewolf)
+      | Doppelganger (Some Mason)
+      | Doppelganger (Some Minion) ) ) ->
       true
   | Robber, Robber -> true
   | Troublemaker, Troublemaker -> true
-  | Dawn, (Insomniac | Drunk | Doppleganger (Some Insomniac)) -> true
-  | Doppleganger, Doppleganger _ -> true
-  | Doppleganger_seer, Doppleganger (Some Seer) -> true
-  | Doppleganger_robber, Doppleganger (Some Robber) -> true
-  | Doppleganger_troublemaker, Doppleganger (Some Troublemaker) -> true
-  | Doppleganger_drunk, Doppleganger (Some Drunk) -> true
+  | Dawn, (Insomniac | Drunk | Doppelganger (Some Insomniac)) -> true
+  | Doppelganger, Doppelganger _ -> true
+  | Doppelganger_seer, Doppelganger (Some Seer) -> true
+  | Doppelganger_robber, Doppelganger (Some Robber) -> true
+  | Doppelganger_troublemaker, Doppelganger (Some Troublemaker) -> true
+  | Doppelganger_drunk, Doppelganger (Some Drunk) -> true
   | _, _ -> false
 
 let get_page_for_insomniac _t (user : User.t) =
@@ -163,7 +163,7 @@ let get_page_for_mason t (user : User.t) =
       let other_masons =
         Hashtbl.filter t.users ~f:(fun other_user ->
             match other_user.original_role with
-            | Role.Mason | Role.Doppleganger (Some Mason) ->
+            | Role.Mason | Role.Doppelganger (Some Mason) ->
                 not (Username.equal other_user.username user.username)
             | _ -> false)
         |> Hashtbl.keys
@@ -265,7 +265,7 @@ let what_werewolf_sees t (user : User.t) =
   let other_werewolves =
     Hashtbl.filter t.users ~f:(fun other_user ->
         match other_user.original_role with
-        | Role.Werewolf | Role.Doppleganger (Some Werewolf) ->
+        | Role.Werewolf | Role.Doppelganger (Some Werewolf) ->
             not (Username.equal other_user.username user.username)
         | _ -> false)
     |> Hashtbl.keys
@@ -354,7 +354,7 @@ let get_page_for_doppleganger t (user : User.t) =
         Cards
           [
             ( match user.current_role with
-            | Doppleganger (Some role) -> role
+            | Doppelganger (Some role) -> role
             | _ -> assert false );
           ];
         Ack_button;
@@ -364,7 +364,7 @@ let get_page_for_doppleganger t (user : User.t) =
       | Ack :: Choose_user _ :: Ack :: rest -> (
           let inputs = List.rev (Input.Ack :: rest) in
           match user.original_role with
-          | Doppleganger (Some role) -> (
+          | Doppelganger (Some role) -> (
               let user = { user with original_role = role; inputs } in
               match role with
               | Robber -> get_page_for_robber t user
@@ -376,7 +376,7 @@ let get_page_for_doppleganger t (user : User.t) =
               | Mason -> get_page_for_mason t user
               | Insomniac -> get_page_for_insomniac t user
               | Drunk -> get_page_for_drunk t user
-              | Doppleganger _ ->
+              | Doppelganger _ ->
                   [ Text "An error has occurred. Please start a new game." ] )
           | _ -> [ Text "An error has occurred. Please start a new game." ] )
       | _ -> [ Text "An error has occurred. Please start a new game." ] )
@@ -443,7 +443,7 @@ let get_page_for_user t (user : User.t) =
       let loser = Hashtbl.find_exn t.users loser in
       let role_to_string role =
         match role with
-        | Role.Doppleganger (Some role) -> sprintf !"Doppleganger-%{Role}" role
+        | Role.Doppelganger (Some role) -> sprintf !"Doppelganger-%{Role}" role
         | _ -> Role.to_string role
       in
       let other_votes =
@@ -507,7 +507,7 @@ let get_page_for_user t (user : User.t) =
         | Mason -> get_page_for_mason t user
         | Insomniac -> get_page_for_insomniac t user
         | Drunk -> get_page_for_drunk t user
-        | Doppleganger _ -> get_page_for_doppleganger t user )
+        | Doppelganger _ -> get_page_for_doppleganger t user )
 
 let validate_input t (user : User.t) (input : Input.t) =
   match t.phase with
@@ -524,7 +524,7 @@ let validate_input t (user : User.t) (input : Input.t) =
       else
         let user_inputs =
           match user.original_role with
-          | Doppleganger (Some _) -> (
+          | Doppelganger (Some _) -> (
               match List.rev user.inputs with
               | Ack :: Choose_user [ _ ] :: inputs -> List.rev inputs
               | _ -> assert false )
@@ -532,7 +532,7 @@ let validate_input t (user : User.t) (input : Input.t) =
         in
         let original_role =
           match user.original_role with
-          | Doppleganger (Some role) -> role
+          | Doppelganger (Some role) -> role
           | role -> role
         in
         match original_role with
@@ -563,12 +563,12 @@ let validate_input t (user : User.t) (input : Input.t) =
             | _ -> false )
         | Villager | Tanner -> (
             match (user_inputs, input) with [], Ack -> true | _ -> false )
-        | Doppleganger None -> (
+        | Doppelganger None -> (
             match (user_inputs, input) with
             | [], Ack -> true
             | [ Ack ], Choose_user [ user ] -> Hashtbl.mem t.users user
             | _ -> false )
-        | Doppleganger (Some _) -> false )
+        | Doppelganger (Some _) -> false )
 
 let record_action t (user : User.t) (input : Input.t) =
   match t.phase with
@@ -582,7 +582,7 @@ let record_action t (user : User.t) (input : Input.t) =
       else
         let user_inputs =
           match user.original_role with
-          | Doppleganger (Some _) -> (
+          | Doppelganger (Some _) -> (
               match List.rev user.inputs with
               | Ack :: Choose_user [ _ ] :: inputs -> List.rev inputs
               | _ -> assert false )
@@ -590,7 +590,7 @@ let record_action t (user : User.t) (input : Input.t) =
         in
         let original_role =
           match user.original_role with
-          | Doppleganger (Some role) -> role
+          | Doppelganger (Some role) -> role
           | role -> role
         in
         match original_role with
@@ -677,7 +677,7 @@ let record_action t (user : User.t) (input : Input.t) =
                 let other_masons =
                   Hashtbl.filter t.users ~f:(fun other_user ->
                       match other_user.original_role with
-                      | Role.Mason | Role.Doppleganger (Some Mason) ->
+                      | Role.Mason | Role.Doppelganger (Some Mason) ->
                           not (Username.equal other_user.username user.username)
                       | _ -> false)
                   |> Hashtbl.keys
@@ -710,21 +710,21 @@ let record_action t (user : User.t) (input : Input.t) =
                   !"Saw that your card was now %{Role}"
                   user.current_role
             | _ -> () )
-        | Doppleganger None -> (
+        | Doppelganger None -> (
             match (user_inputs, input) with
             | [ Ack ], Choose_user [ username ] ->
                 User.record_action user
                   !"Assumed %s's role: the %{Role}"
                   username (Hashtbl.find_exn t.users username).current_role
             | _ -> () )
-        | Doppleganger (Some _) | Villager | Tanner -> () )
+        | Doppelganger (Some _) | Villager | Tanner -> () )
 
 let swap_drunk ?(doppleganger = false) t =
   let users = Hashtbl.data t.users in
   match
     List.find users ~f:(fun user ->
         let drunk_role =
-          if doppleganger then Role.Doppleganger (Some Drunk) else Role.Drunk
+          if doppleganger then Role.Doppelganger (Some Drunk) else Role.Drunk
         in
         Role.equal user.original_role drunk_role)
   with
@@ -746,7 +746,7 @@ let rec maybe_change_phase t =
         |> Hashtbl.is_empty
       in
       if phase_over then (
-        t.phase <- Night Doppleganger;
+        t.phase <- Night Doppelganger;
         maybe_change_phase t )
   | Day ->
       let phase_over =
@@ -765,52 +765,52 @@ let rec maybe_change_phase t =
         t.phase <- Results;
         maybe_change_phase t )
   | Results -> ()
-  | Night Doppleganger ->
+  | Night Doppelganger ->
       let phase_over =
         Hashtbl.for_all t.users ~f:(fun user ->
             match user.original_role with
-            | Doppleganger _ -> List.length user.inputs = 3
+            | Doppelganger _ -> List.length user.inputs = 3
             | _ -> true)
       in
       if phase_over then (
-        t.phase <- Night Doppleganger_seer;
+        t.phase <- Night Doppelganger_seer;
         maybe_change_phase t )
-  | Night Doppleganger_seer ->
+  | Night Doppelganger_seer ->
       let phase_over =
         Hashtbl.for_all t.users ~f:(fun user ->
             match user.original_role with
-            | Doppleganger (Some Seer) -> List.length user.inputs = 5
+            | Doppelganger (Some Seer) -> List.length user.inputs = 5
             | _ -> true)
       in
       if phase_over then (
-        t.phase <- Night Doppleganger_robber;
+        t.phase <- Night Doppelganger_robber;
         maybe_change_phase t )
-  | Night Doppleganger_robber ->
+  | Night Doppelganger_robber ->
       let phase_over =
         Hashtbl.for_all t.users ~f:(fun user ->
             match user.original_role with
-            | Doppleganger (Some Robber) -> List.length user.inputs = 5
+            | Doppelganger (Some Robber) -> List.length user.inputs = 5
             | _ -> true)
       in
       if phase_over then (
-        t.phase <- Night Doppleganger_troublemaker;
+        t.phase <- Night Doppelganger_troublemaker;
         maybe_change_phase t )
-  | Night Doppleganger_troublemaker ->
+  | Night Doppelganger_troublemaker ->
       let phase_over =
         Hashtbl.for_all t.users ~f:(fun user ->
             match user.original_role with
-            | Doppleganger (Some Troublemaker) -> List.length user.inputs = 4
+            | Doppelganger (Some Troublemaker) -> List.length user.inputs = 4
             | _ -> true)
       in
       if phase_over then (
         swap_drunk t ~doppleganger:true;
-        t.phase <- Night Doppleganger_drunk;
+        t.phase <- Night Doppelganger_drunk;
         maybe_change_phase t )
-  | Night Doppleganger_drunk ->
+  | Night Doppelganger_drunk ->
       let phase_over =
         Hashtbl.for_all t.users ~f:(fun user ->
             match user.original_role with
-            | Doppleganger (Some Drunk) -> List.length user.inputs = 4
+            | Doppelganger (Some Drunk) -> List.length user.inputs = 4
             | _ -> true)
       in
       if phase_over then (
@@ -824,9 +824,9 @@ let rec maybe_change_phase t =
             | Seer -> not (List.length user.inputs = 3)
             | Mason -> not (List.length user.inputs = 2)
             | Minion -> not (List.length user.inputs = 2)
-            | Doppleganger (Some (Werewolf | Mason | Minion)) ->
+            | Doppelganger (Some (Werewolf | Mason | Minion)) ->
                 not (List.length user.inputs = 4)
-            | Doppleganger _ | Robber | Troublemaker | Villager | Insomniac
+            | Doppelganger _ | Robber | Troublemaker | Villager | Insomniac
             | Tanner | Drunk ->
                 false)
         |> Hashtbl.is_empty
@@ -863,7 +863,7 @@ let rec maybe_change_phase t =
             match user.original_role with
             | Insomniac -> not (List.length user.inputs = 2)
             | Drunk -> not (List.length user.inputs = 2)
-            | Doppleganger (Some Insomniac) -> not (List.length user.inputs = 4)
+            | Doppelganger (Some Insomniac) -> not (List.length user.inputs = 4)
             | _ -> false)
         |> Hashtbl.is_empty
       in
@@ -882,7 +882,7 @@ let on_input t username input =
         | Night _ -> (
             let original_role =
               match user.original_role with
-              | Doppleganger (Some role) -> role
+              | Doppelganger (Some role) -> role
               | role -> role
             in
             match original_role with
@@ -910,17 +910,17 @@ let on_input t username input =
                         user1.current_role <- user2.current_role;
                         user2.current_role <- role1 )
                 | _ -> assert false )
-            | Doppleganger None -> (
+            | Doppelganger None -> (
                 match input with
                 | Ack -> ()
                 | Choose_user [ username ] ->
                     let other_user = Hashtbl.find_exn t.users username in
                     user.original_role <-
-                      Doppleganger (Some other_user.original_role);
+                      Doppelganger (Some other_user.original_role);
                     user.current_role <-
-                      Doppleganger (Some other_user.original_role)
+                      Doppelganger (Some other_user.original_role)
                 | _ -> assert false )
-            | Doppleganger _ -> ()
+            | Doppelganger _ -> ()
             | Werewolf -> ()
             | Mason -> ()
             | Seer -> ()
