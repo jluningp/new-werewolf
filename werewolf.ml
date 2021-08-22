@@ -1,17 +1,54 @@
 open Core
 open Shared
 
-module Random_cache = struct
+module Random_cache : sig
+  type t
+
+  val create : unit -> t
+
+  val drunk_card : t -> Username.t -> int
+
+  val werewolf_sees_card : t -> Username.t -> int
+
+  val seer_doesnt_see_card : t -> Username.t -> int
+end = struct
   type t = {
-    seer_doesnt_see_card : int;
-    werewolf_sees_card : int;
-    drunk_card : int;
+    seer_doesnt_see_card : int Username.Table.t;
+    werewolf_sees_card : int Username.Table.t;
+    drunk_card : int Username.Table.t;
   }
+
+  let create () =
+    {
+      seer_doesnt_see_card = Username.Table.create ();
+      werewolf_sees_card = Username.Table.create ();
+      drunk_card = Username.Table.create ();
+    }
+
+  let drunk_card t user =
+    Hashtbl.find_or_add t.drunk_card user ~default:(fun () -> Random.int 3)
+
+  let werewolf_sees_card t user =
+    Hashtbl.find_or_add t.werewolf_sees_card user ~default:(fun () ->
+        Random.int 3)
+
+  let seer_doesnt_see_card t user =
+    Hashtbl.find_or_add t.seer_doesnt_see_card user ~default:(fun () ->
+        Random.int 3)
 end
 
 module Phase = struct
   module Night = struct
-    type t = Viewer | Robber | Troublemaker | Dawn
+    type t =
+      | Doppleganger
+      | Doppleganger_seer
+      | Doppleganger_robber
+      | Doppleganger_troublemaker
+      | Doppleganger_drunk
+      | Viewer
+      | Robber
+      | Troublemaker
+      | Dawn
   end
 
   type t = View_roles | Day | Night of Night.t | Vote | Results
@@ -33,7 +70,7 @@ module User = struct
   type t = {
     username : Username.t;
     mutable inputs : Input.t list;
-    original_role : Role.t;
+    mutable original_role : Role.t;
     mutable current_role : Role.t;
     mutable actions : string list;
   }
@@ -64,7 +101,7 @@ let center_card_users =
   [ center_card_username; center_card_username; center_card_username ]
 
 let assign_roles roles users =
-  let users = List.permute (center_card_users @ users) in
+  let users = List.permute (users @ center_card_users) in
   match List.zip users roles with
   | Unequal_lengths -> Or_error.error_string "Incorrect number of roles."
   | Ok role_assignments ->
@@ -86,22 +123,27 @@ let create roles users =
             {
               users =
                 Hashtbl.mapi users ~f:(fun ~key ~data -> User.create key data);
-              random_cache =
-                {
-                  seer_doesnt_see_card = Random.int 3;
-                  werewolf_sees_card = Random.int 3;
-                  drunk_card = Random.int 3;
-                };
+              random_cache = Random_cache.create ();
               phase = View_roles;
               center_cards;
             } )
 
 let is_users_turn night_phase (user : User.t) =
   match (night_phase, user.original_role) with
-  | Phase.Night.Viewer, (Werewolf | Seer | Mason | Minion) -> true
+  | ( Phase.Night.Viewer,
+      ( Werewolf | Seer | Mason | Minion
+      | Doppleganger (Some Werewolf)
+      | Doppleganger (Some Mason)
+      | Doppleganger (Some Minion) ) ) ->
+      true
   | Robber, Robber -> true
   | Troublemaker, Troublemaker -> true
-  | Dawn, (Insomniac | Drunk) -> true
+  | Dawn, (Insomniac | Drunk | Doppleganger (Some Insomniac)) -> true
+  | Doppleganger, Doppleganger _ -> true
+  | Doppleganger_seer, Doppleganger (Some Seer) -> true
+  | Doppleganger_robber, Doppleganger (Some Robber) -> true
+  | Doppleganger_troublemaker, Doppleganger (Some Troublemaker) -> true
+  | Doppleganger_drunk, Doppleganger (Some Drunk) -> true
   | _, _ -> false
 
 let get_page_for_insomniac _t (user : User.t) =
@@ -121,18 +163,20 @@ let get_page_for_mason t (user : User.t) =
       let other_masons =
         Hashtbl.filter t.users ~f:(fun other_user ->
             match other_user.original_role with
-            | Role.Mason ->
+            | Role.Mason | Role.Doppleganger (Some Mason) ->
                 not (Username.equal other_user.username user.username)
             | _ -> false)
         |> Hashtbl.keys
       in
       match other_masons with
       | [] -> [ Page.Element.Text "There are no other masons."; Ack_button ]
-      | [ mason ] -> [ Text (sprintf "The other mason is %s." mason) ]
+      | [ mason ] ->
+          [ Text (sprintf "The other mason is %s." mason); Ack_button ]
       | masons ->
           [
             Text "These are the other masons:";
             Text (String.concat ~sep:", " masons);
+            Ack_button;
           ] )
   | [ Ack; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game" ]
@@ -190,7 +234,8 @@ let get_page_for_seer t (user : User.t) =
   | [ View_center_cards; Ack ] ->
       let center_cards =
         List.filteri t.center_cards ~f:(fun idx _ ->
-            t.random_cache.seer_doesnt_see_card <> idx)
+            Random_cache.seer_doesnt_see_card t.random_cache user.username
+            <> idx)
       in
       [ Text "Two of the center cards:"; Cards center_cards; Ack_button ]
   | [ Ack; (View_center_cards | Choose_user _); Ack ] -> [ Text "Waiting" ]
@@ -218,14 +263,14 @@ let what_werewolf_sees t (user : User.t) =
   let other_werewolves =
     Hashtbl.filter t.users ~f:(fun other_user ->
         match other_user.original_role with
-        | Role.Werewolf ->
+        | Role.Werewolf | Role.Doppleganger (Some Werewolf) ->
             not (Username.equal other_user.username user.username)
         | _ -> false)
     |> Hashtbl.keys
   in
   match other_werewolves with
   | [] ->
-      let card = t.random_cache.werewolf_sees_card in
+      let card = Random_cache.werewolf_sees_card t.random_cache user.username in
       let center_cards = List.filteri t.center_cards ~f:(fun i _ -> i = card) in
       `Center_cards center_cards
   | werewolves -> `Other_werewolves werewolves
@@ -263,6 +308,55 @@ let get_page_for_werewolf t (user : User.t) =
           ] )
   | [ Ack; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game." ]
+
+let get_page_for_doppleganger t (user : User.t) =
+  match user.inputs with
+  | [ Ack ] ->
+      [
+        Page.Element.Text
+          "Look at another player's card. You will become that role.";
+        Choose_user
+          {
+            choose_this_many = 1;
+            or_center = false;
+            users =
+              Hashtbl.keys t.users
+              |> List.filter ~f:(fun username ->
+                     not (String.equal user.username username));
+          };
+      ]
+  | [ Choose_user _; Ack ] ->
+      [
+        Text "You are now this role:";
+        Cards
+          [
+            ( match user.current_role with
+            | Doppleganger (Some role) -> role
+            | _ -> assert false );
+          ];
+        Ack_button;
+      ]
+  | inputs -> (
+      match List.rev inputs with
+      | Ack :: Choose_user _ :: Ack :: rest -> (
+          let inputs = List.rev (Input.Ack :: rest) in
+          match user.original_role with
+          | Doppleganger (Some role) -> (
+              let user = { user with original_role = role; inputs } in
+              match role with
+              | Robber -> get_page_for_robber t user
+              | Werewolf -> get_page_for_werewolf t user
+              | Minion -> get_page_for_minion t user
+              | Seer -> get_page_for_seer t user
+              | Villager | Tanner -> [ Text "Waiting" ]
+              | Troublemaker -> get_page_for_troublemaker t user
+              | Mason -> get_page_for_mason t user
+              | Insomniac -> get_page_for_insomniac t user
+              | Drunk -> get_page_for_drunk t user
+              | Doppleganger _ ->
+                  [ Text "An error has occurred. Please start a new game." ] )
+          | _ -> [ Text "An error has occurred. Please start a new game." ] )
+      | _ -> [ Text "An error has occurred. Please start a new game." ] )
 
 let get_page_for_user t (user : User.t) =
   match t.phase with
@@ -324,6 +418,11 @@ let get_page_for_user t (user : User.t) =
       in
       let loser, losing_votes = List.hd_exn votes in
       let loser = Hashtbl.find_exn t.users loser in
+      let role_to_string role =
+        match role with
+        | Role.Doppleganger (Some role) -> sprintf !"Doppleganger-%{Role}" role
+        | _ -> Role.to_string role
+      in
       let other_votes =
         match votes with
         | [] | [ _ ] -> []
@@ -341,8 +440,9 @@ let get_page_for_user t (user : User.t) =
                            Html.li []
                              [
                                Html.text
-                                 (sprintf !"%s (%{Role}): %n vote%s"
-                                    user.username user.current_role votes
+                                 (sprintf !"%s (%s): %n vote%s" user.username
+                                    (role_to_string user.current_role)
+                                    votes
                                     (if votes = 1 then "" else "s"));
                              ]))));
             ]
@@ -350,8 +450,10 @@ let get_page_for_user t (user : User.t) =
       [
         Page.Element.Centered_text
           (sprintf
-             !"%s (the %{Role}) received the most votes (%n)."
-             loser.username loser.current_role losing_votes);
+             !"%s (the %s) received the most votes (%n)."
+             loser.username
+             (role_to_string loser.current_role)
+             losing_votes);
       ]
       @ other_votes
       @ [
@@ -364,8 +466,8 @@ let get_page_for_user t (user : User.t) =
                        Html.li []
                          [
                            Html.text
-                             (sprintf !"%s: %{Role}" user.username
-                                user.current_role);
+                             (sprintf !"%s: %s" user.username
+                                (role_to_string user.current_role));
                          ]))));
           No_refresh;
         ]
@@ -381,7 +483,8 @@ let get_page_for_user t (user : User.t) =
         | Troublemaker -> get_page_for_troublemaker t user
         | Mason -> get_page_for_mason t user
         | Insomniac -> get_page_for_insomniac t user
-        | Drunk -> get_page_for_drunk t user )
+        | Drunk -> get_page_for_drunk t user
+        | Doppleganger _ -> get_page_for_doppleganger t user )
 
 let validate_input t (user : User.t) (input : Input.t) =
   match t.phase with
@@ -396,14 +499,28 @@ let validate_input t (user : User.t) (input : Input.t) =
   | Night phase -> (
       if not (is_users_turn phase user) then false
       else
-        match user.original_role with
+        let user_inputs =
+          match user.original_role with
+          | Doppleganger (Some _) -> (
+              match List.rev user.inputs with
+              | Ack :: Choose_user [ _ ] :: inputs -> List.rev inputs
+              | _ -> assert false )
+          | _ -> user.inputs
+        in
+        let original_role =
+          match user.original_role with
+          | Doppleganger (Some role) -> role
+          | role -> role
+        in
+        match original_role with
         | Robber -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
+            | [], Ack -> true
             | [ Ack ], Choose_user [ username ] -> Hashtbl.mem t.users username
             | [ Choose_user _; Ack ], Ack -> true
             | _ -> false )
         | Seer -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [], Ack -> true
             | [ Ack ], Choose_user [ username ] -> Hashtbl.mem t.users username
             | [ Ack ], View_center_cards -> true
@@ -411,18 +528,24 @@ let validate_input t (user : User.t) (input : Input.t) =
             | [ View_center_cards; Ack ], Ack -> true
             | _ -> false )
         | Troublemaker -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [], Ack -> true
             | [ Ack ], Choose_user [ user1; user2 ] ->
                 Hashtbl.mem t.users user1 && Hashtbl.mem t.users user2
             | _ -> false )
         | Werewolf | Mason | Insomniac | Drunk | Minion -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [], Ack -> true
             | [ Ack ], Ack -> true
             | _ -> false )
         | Villager | Tanner -> (
-            match (user.inputs, input) with [], Ack -> true | _ -> false ) )
+            match (user_inputs, input) with [], Ack -> true | _ -> false )
+        | Doppleganger None -> (
+            match (user_inputs, input) with
+            | [], Ack -> true
+            | [ Ack ], Choose_user [ user ] -> Hashtbl.mem t.users user
+            | _ -> false )
+        | Doppleganger (Some _) -> false )
 
 let record_action t (user : User.t) (input : Input.t) =
   match t.phase with
@@ -434,9 +557,22 @@ let record_action t (user : User.t) (input : Input.t) =
   | Night phase -> (
       if not (is_users_turn phase user) then ()
       else
-        match user.original_role with
+        let user_inputs =
+          match user.original_role with
+          | Doppleganger (Some _) -> (
+              match List.rev user.inputs with
+              | Ack :: Choose_user [ _ ] :: inputs -> List.rev inputs
+              | _ -> assert false )
+          | _ -> user.inputs
+        in
+        let original_role =
+          match user.original_role with
+          | Doppleganger (Some role) -> role
+          | role -> role
+        in
+        match original_role with
         | Robber -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Choose_user [ username ] ->
                 User.record_action user !"Robbed %s" username
             | [ Choose_user _; Ack ], Ack ->
@@ -445,7 +581,7 @@ let record_action t (user : User.t) (input : Input.t) =
                   user.current_role
             | _ -> () )
         | Werewolf -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Ack -> (
                 match what_werewolf_sees t user with
                 | `Center_cards [ c1 ] ->
@@ -466,7 +602,7 @@ let record_action t (user : User.t) (input : Input.t) =
                     | _ -> () ) )
             | _ -> () )
         | Minion -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Ack -> (
                 match what_werewolf_sees t user with
                 | `Center_cards _ ->
@@ -484,7 +620,7 @@ let record_action t (user : User.t) (input : Input.t) =
                     | _ -> () ) )
             | _ -> () )
         | Seer -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Choose_user [ username ] ->
                 User.record_action user "Chose to see %s's card" username
             | [ Ack ], View_center_cards ->
@@ -496,7 +632,9 @@ let record_action t (user : User.t) (input : Input.t) =
             | [ View_center_cards; Ack ], Ack -> (
                 let center_cards =
                   List.filteri t.center_cards ~f:(fun idx _ ->
-                      t.random_cache.seer_doesnt_see_card <> idx)
+                      Random_cache.seer_doesnt_see_card t.random_cache
+                        user.username
+                      <> idx)
                 in
                 match center_cards with
                 | [ c1; c2 ] ->
@@ -506,17 +644,17 @@ let record_action t (user : User.t) (input : Input.t) =
                 | _ -> () )
             | _ -> () )
         | Troublemaker -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Choose_user [ user1; user2 ] ->
                 User.record_action user !"Swapped %s and %s" user1 user2
             | _ -> () )
         | Mason -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Ack -> (
                 let other_masons =
                   Hashtbl.filter t.users ~f:(fun other_user ->
                       match other_user.original_role with
-                      | Role.Mason ->
+                      | Role.Mason | Role.Doppleganger (Some Mason) ->
                           not (Username.equal other_user.username user.username)
                       | _ -> false)
                   |> Hashtbl.keys
@@ -535,33 +673,45 @@ let record_action t (user : User.t) (input : Input.t) =
                       m1 )
             | _ -> () )
         | Insomniac -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Ack ->
                 User.record_action user
                   !"Saw that your card was now %{Role}"
                   user.current_role
             | _ -> () )
         | Drunk -> (
-            match (user.inputs, input) with
+            match (user_inputs, input) with
             | [ Ack ], Ack ->
                 User.record_action user "Swapped your card with a center card";
                 User.record_action user
                   !"Saw that your card was now %{Role}"
                   user.current_role
             | _ -> () )
-        | Villager | Tanner -> () )
+        | Doppleganger None -> (
+            match (user_inputs, input) with
+            | [ Ack ], Choose_user [ username ] ->
+                User.record_action user
+                  !"Assumed %s's role: the %{Role}"
+                  username (Hashtbl.find_exn t.users username).current_role
+            | _ -> () )
+        | Doppleganger (Some _) | Villager | Tanner -> () )
 
-let swap_drunk t =
+let swap_drunk ?(doppleganger = false) t =
   let users = Hashtbl.data t.users in
   match
-    List.find users ~f:(fun user -> Role.equal user.original_role Drunk)
+    List.find users ~f:(fun user ->
+        let drunk_role =
+          if doppleganger then Role.Doppleganger (Some Drunk) else Role.Drunk
+        in
+        Role.equal user.original_role drunk_role)
   with
   | None -> ()
   | Some drunk ->
-      let card = List.nth_exn t.center_cards t.random_cache.drunk_card in
+      let drunk_card = Random_cache.drunk_card t.random_cache drunk.username in
+      let card = List.nth_exn t.center_cards drunk_card in
       t.center_cards <-
         List.mapi t.center_cards ~f:(fun i card ->
-            if i = t.random_cache.drunk_card then drunk.current_role else card);
+            if i = drunk_card then drunk.current_role else card);
       drunk.current_role <- card
 
 let rec maybe_change_phase t =
@@ -573,7 +723,7 @@ let rec maybe_change_phase t =
         |> Hashtbl.is_empty
       in
       if phase_over then (
-        t.phase <- Night Viewer;
+        t.phase <- Night Doppleganger;
         maybe_change_phase t )
   | Day ->
       let phase_over =
@@ -592,6 +742,57 @@ let rec maybe_change_phase t =
         t.phase <- Results;
         maybe_change_phase t )
   | Results -> ()
+  | Night Doppleganger ->
+      let phase_over =
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.original_role with
+            | Doppleganger _ -> List.length user.inputs = 3
+            | _ -> true)
+      in
+      if phase_over then (
+        t.phase <- Night Doppleganger_seer;
+        maybe_change_phase t )
+  | Night Doppleganger_seer ->
+      let phase_over =
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.original_role with
+            | Doppleganger (Some Seer) -> List.length user.inputs = 5
+            | _ -> true)
+      in
+      if phase_over then (
+        t.phase <- Night Doppleganger_robber;
+        maybe_change_phase t )
+  | Night Doppleganger_robber ->
+      let phase_over =
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.original_role with
+            | Doppleganger (Some Robber) -> List.length user.inputs = 5
+            | _ -> true)
+      in
+      if phase_over then (
+        t.phase <- Night Doppleganger_troublemaker;
+        maybe_change_phase t )
+  | Night Doppleganger_troublemaker ->
+      let phase_over =
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.original_role with
+            | Doppleganger (Some Troublemaker) -> List.length user.inputs = 4
+            | _ -> true)
+      in
+      if phase_over then (
+        swap_drunk t ~doppleganger:true;
+        t.phase <- Night Doppleganger_drunk;
+        maybe_change_phase t )
+  | Night Doppleganger_drunk ->
+      let phase_over =
+        Hashtbl.for_all t.users ~f:(fun user ->
+            match user.original_role with
+            | Doppleganger (Some Drunk) -> List.length user.inputs = 4
+            | _ -> true)
+      in
+      if phase_over then (
+        t.phase <- Night Viewer;
+        maybe_change_phase t )
   | Night Viewer ->
       let phase_over =
         Hashtbl.filter t.users ~f:(fun user ->
@@ -600,7 +801,10 @@ let rec maybe_change_phase t =
             | Seer -> not (List.length user.inputs = 3)
             | Mason -> not (List.length user.inputs = 2)
             | Minion -> not (List.length user.inputs = 2)
-            | Robber | Troublemaker | Villager | Insomniac | Tanner | Drunk ->
+            | Doppleganger (Some (Werewolf | Mason | Minion)) ->
+                not (List.length user.inputs = 4)
+            | Doppleganger _ | Robber | Troublemaker | Villager | Insomniac
+            | Tanner | Drunk ->
                 false)
         |> Hashtbl.is_empty
       in
@@ -636,6 +840,7 @@ let rec maybe_change_phase t =
             match user.original_role with
             | Insomniac -> not (List.length user.inputs = 2)
             | Drunk -> not (List.length user.inputs = 2)
+            | Doppleganger (Some Insomniac) -> not (List.length user.inputs = 4)
             | _ -> false)
         |> Hashtbl.is_empty
       in
@@ -652,7 +857,12 @@ let on_input t username input =
         user.inputs <- input :: user.inputs;
         ( match t.phase with
         | Night _ -> (
-            match user.original_role with
+            let original_role =
+              match user.original_role with
+              | Doppleganger (Some role) -> role
+              | role -> role
+            in
+            match original_role with
             | Robber -> (
                 match input with
                 | Ack -> ()
@@ -677,6 +887,17 @@ let on_input t username input =
                         user1.current_role <- user2.current_role;
                         user2.current_role <- role1 )
                 | _ -> assert false )
+            | Doppleganger None -> (
+                match input with
+                | Ack -> ()
+                | Choose_user [ username ] ->
+                    let other_user = Hashtbl.find_exn t.users username in
+                    user.original_role <-
+                      Doppleganger (Some other_user.original_role);
+                    user.current_role <-
+                      Doppleganger (Some other_user.original_role)
+                | _ -> assert false )
+            | Doppleganger _ -> ()
             | Werewolf -> ()
             | Mason -> ()
             | Seer -> ()

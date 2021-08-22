@@ -35,9 +35,17 @@
       h3 {
 	  font-family: 'Courier New', monospace;
       }
-      #endgame {
+      
+      #leavegame {
 	  text-align: right;
 	  cursor:pointer;
+	  float:right;
+      }
+      #endgame {
+	  text-align: left;
+	  cursor:pointer;
+	  float:left;
+	  color:gray;
       }
       img {
 	  max-width:200px;
@@ -141,6 +149,7 @@
     <div id=body>
       <div id=game></div>
       <div id="endgame"><small><a onclick="endGame()">End game</a></small></div>
+      <div id="leavegame"><small><a onclick="leaveGame()">Leave game</a></small></div>
     </div>
   </body>
   <script src="script.js"></script>

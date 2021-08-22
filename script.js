@@ -68,6 +68,7 @@ function usernameQuery () {
 function createGame () {
     updateUsername();
     get("action/create?" + usernameQuery(), getUpdatedPage);
+    get("action/join?" + usernameQuery(), getUpdatedPage);
 }
 
 function joinGame () {
@@ -129,5 +130,8 @@ function endGame() {
     get("action/end_game?" + usernameQuery (), getUpdatedPage);
 }
 
+function leaveGame() {
+    get("action/leave?" + usernameQuery (), getUpdatedPage);
+}
 
 getUpdatedPage();

@@ -14,7 +14,23 @@ module Role = struct
     | Tanner
     | Minion
     | Drunk
-  [@@deriving sexp, equal, enumerate]
+    | Doppleganger of t option
+  [@@deriving sexp, equal]
+
+  let all =
+    [
+      Robber;
+      Werewolf;
+      Seer;
+      Troublemaker;
+      Villager;
+      Insomniac;
+      Mason;
+      Tanner;
+      Minion;
+      Drunk;
+      Doppleganger None;
+    ]
 
   let card_image role =
     match role with
@@ -28,10 +44,17 @@ module Role = struct
     | Minion -> "images/minions.png"
     | Drunk -> "images/drunks.png"
     | Tanner -> "images/tanners.png"
+    | Doppleganger _ -> "images/dopplegangers.png"
 
-  let of_string str = t_of_sexp (Sexp.of_string str)
+  let of_string str =
+    match str with
+    | "Doppleganger" -> Doppleganger None
+    | _ -> t_of_sexp (Sexp.of_string str)
 
-  let to_string t = Sexp.to_string (sexp_of_t t)
+  let to_string t =
+    match t with
+    | Doppleganger _ -> "Doppleganger"
+    | _ -> Sexp.to_string (sexp_of_t t)
 end
 
 module Page = struct

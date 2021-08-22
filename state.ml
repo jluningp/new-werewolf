@@ -9,6 +9,7 @@ module Action = struct
   type t =
     | Create_game
     | Join_game
+    | Leave_game
     | Set_role of Role.t * int
     | Start_game
     | Game_input of Input.t
@@ -19,12 +20,10 @@ module Join = struct
   let create_game =
     Html.div
       [ ("id", "button"); ("onclick", "createGame()") ]
-      [ Html.text "START" ]
+      [ Html.text "GO" ]
 
   let join_game =
-    Html.div
-      [ ("id", "button"); ("onclick", "joinGame()") ]
-      [ Html.text "START" ]
+    Html.div [ ("id", "button"); ("onclick", "joinGame()") ] [ Html.text "GO" ]
 
   let get_page ~existing_game ~username =
     let username = Option.value ~default:"" username in
@@ -39,7 +38,18 @@ module Join = struct
           ])
     in
     Html.div []
-      [ username_input; (if existing_game then join_game else create_game) ]
+      [
+        username_input;
+        Html.br;
+        Html.div
+          [ ("style", "font-size:small;") ]
+          [
+            Html.text
+              "Press \"GO\" to join the game. If no game currently exists, one \
+               will be created.";
+          ];
+        (if existing_game then join_game else create_game);
+      ]
     |> Html.to_string
 end
 
@@ -103,7 +113,8 @@ module Setup = struct
     match role with
     | Role.Werewolf | Villager | Insomniac | Mason | Seer | Tanner | Minion ->
         number_select t role ~is_admin
-    | Robber | Troublemaker | Drunk -> single_select t role ~is_admin
+    | Robber | Troublemaker | Drunk | Doppleganger _ ->
+        single_select t role ~is_admin
 
   let get_page t user =
     let html =
@@ -147,6 +158,12 @@ module Setup = struct
       t.users <- user :: t.users;
       Ok () )
 
+  let remove_user t user =
+    t.users <-
+      List.filter t.users ~f:(fun username ->
+          not (Username.equal user username));
+    Ok ()
+
   let set_role t role count =
     if count >= 0 then
       let roles =
@@ -186,6 +203,9 @@ let action t action username =
   | Setup _, Create_game -> ()
   | Setup setup, Join_game ->
       let (_ : unit Or_error.t) = Setup.add_user setup username in
+      ()
+  | Setup setup, Leave_game ->
+      let (_ : unit Or_error.t) = Setup.remove_user setup username in
       ()
   | Setup setup, Set_role (role, count) -> Setup.set_role setup role count
   | Setup setup, Start_game -> (

@@ -31,6 +31,9 @@ module Query = struct
     | "/action/join" ->
         let%map username = get_username uri in
         Action { username; action = Join_game }
+    | "/action/leave" ->
+        let%map username = get_username uri in
+        Action { username; action = Leave_game }
     | "/action/set_role" ->
         let%bind username = get_username uri in
         let%bind role =
