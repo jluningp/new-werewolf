@@ -67,6 +67,7 @@ module Page = struct
           choose_this_many : int;
           users : Username.t list;
           or_center : bool;
+          or_no_werewolf : bool;
         }
       | Ack_button
       | Vote_button
@@ -93,13 +94,17 @@ module Page = struct
                 img [ ("src", Role.card_image card) ] [])
           in
           div [ ("style", "text-align:center;") ] [ div [] cards ]
-      | Choose_user { choose_this_many; users; or_center } ->
+      | Choose_user { choose_this_many; users; or_center; or_no_werewolf } ->
           let users = if or_center then "center__cards__" :: users else users in
+          let users =
+            if or_no_werewolf then "no__werewolf__" :: users else users
+          in
           let user_select =
             List.map users ~f:(fun user ->
                 let username =
                   match user with
                   | "center__cards__" -> "center cards"
+                  | "no__werewolf__" -> "no werewolf"
                   | _ -> user
                 in
                 let typ =
@@ -160,6 +165,11 @@ module Page = struct
 end
 
 module Input = struct
-  type t = Ack | Choose_user of Username.t list | View_center_cards | Vote
+  type t =
+    | Ack
+    | Choose_user of Username.t list
+    | View_center_cards
+    | Choose_no_werewolf
+    | Vote
   [@@deriving sexp]
 end

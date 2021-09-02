@@ -54,6 +54,8 @@ module Query = struct
         match users with
         | [ "center__cards__" ] ->
             Action { username; action = Game_input View_center_cards }
+        | [ "no__werewolf__" ] ->
+            Action { username; action = Game_input Choose_no_werewolf }
         | _ -> Action { username; action = Game_input (Choose_user users) } )
     | "/action/input/vote" ->
         let%map username = get_username uri in

@@ -34,6 +34,7 @@ module Page : sig
           choose_this_many : int;
           users : Username.t list;
           or_center : bool;
+          or_no_werewolf : bool;
         }
       | Ack_button
       | Vote_button
@@ -46,6 +47,11 @@ module Page : sig
 end
 
 module Input : sig
-  type t = Ack | Choose_user of Username.t list | View_center_cards | Vote
+  type t =
+    | Ack
+    | Choose_user of Username.t list
+    | View_center_cards
+    | Choose_no_werewolf
+    | Vote
   [@@deriving sexp]
 end
