@@ -193,7 +193,12 @@ let get_page_for_troublemaker t (user : User.t) =
       [
         Page.Element.Text "Choose two players to swap";
         Choose_user
-          { choose_this_many = 2; users = other_users; or_center = false };
+          {
+            choose_this_many = 2;
+            users = other_users;
+            or_center = false;
+            or_no_werewolf = false;
+          };
       ]
   | [ Choose_user _; Ack ] -> [ Text "Waiting" ]
   | _ -> [ Text "An error has occurred. Please start a new game" ]
@@ -222,7 +227,12 @@ let get_page_for_seer t (user : User.t) =
         Page.Element.Text
           "View another player's card, or two of the center cards.";
         Choose_user
-          { choose_this_many = 1; users = other_users; or_center = true };
+          {
+            choose_this_many = 1;
+            users = other_users;
+            or_center = true;
+            or_no_werewolf = false;
+          };
       ]
   | [ Choose_user [ username ]; Ack ] -> (
       match Hashtbl.find t.users username with
@@ -254,7 +264,12 @@ let get_page_for_robber t (user : User.t) =
       [
         Page.Element.Text "Choose a player to rob";
         Choose_user
-          { choose_this_many = 1; users = other_users; or_center = false };
+          {
+            choose_this_many = 1;
+            users = other_users;
+            or_center = false;
+            or_no_werewolf = false;
+          };
       ]
   | [ Choose_user [ _ ]; Ack ] ->
       [ Centered_text "Your new card"; Cards [ user.current_role ]; Ack_button ]
@@ -342,6 +357,7 @@ let get_page_for_doppleganger t (user : User.t) =
           {
             choose_this_many = 1;
             or_center = false;
+            or_no_werewolf = false;
             users =
               Hashtbl.keys t.users
               |> List.filter ~f:(fun username ->
@@ -406,8 +422,27 @@ let get_page_for_user t (user : User.t) =
                            Html.li [] [ Html.text str ]))));
             ]
           in
+          let roles =
+            let user_roles =
+              Hashtbl.data t.users
+              |> List.map ~f:(fun user -> user.current_role)
+            in
+            t.center_cards @ user_roles
+            |> List.map ~f:Role.to_string
+            |> List.map ~f:(fun r -> (r, ()))
+            |> String.Map.of_alist_multi |> Map.map ~f:List.length
+            |> Map.to_alist
+          in
           night_actions
           @ [
+              Text "<hr></hr>";
+              Text "These are the roles currently in play: ";
+              Text
+                (Html.to_string
+                   (Html.ul []
+                      (List.map roles ~f:(fun (role, count) ->
+                           Html.li []
+                             [ Html.text (sprintf "%s: %n" role count) ]))));
               Text "<hr></hr>";
               Text
                 "Discuss. When you are ready to vote, hit the \"Ready to \
@@ -417,6 +452,7 @@ let get_page_for_user t (user : User.t) =
   | Vote -> (
       match user.inputs with
       | Choose_user [ _ ] :: _ -> [ Text "Waiting" ]
+      | Choose_no_werewolf :: _ -> [ Text "Waiting" ]
       | _ ->
           [
             Page.Element.Text "Vote:";
@@ -425,6 +461,7 @@ let get_page_for_user t (user : User.t) =
                 choose_this_many = 1;
                 users = Hashtbl.keys t.users;
                 or_center = false;
+                or_no_werewolf = true;
               };
           ] )
   | Results ->
@@ -433,39 +470,43 @@ let get_page_for_user t (user : User.t) =
         |> List.filter_map ~f:(fun user ->
                match user.inputs with
                | Choose_user [ username ] :: _ -> Some username
+               | Choose_no_werewolf :: _ -> Some "no__werewolf__"
                | _ -> None)
         |> List.sort ~compare:String.compare
         |> List.group ~break:(fun s1 s2 -> not (String.equal s1 s2))
         |> List.map ~f:(fun l -> (List.hd_exn l, List.length l))
         |> List.sort ~compare:(fun (_, n1) (_, n2) -> Int.compare n2 n1)
+        |> List.map ~f:(fun (username, count) ->
+               match username with
+               | "no__werewolf__" -> ("\"No werewolf\"", None, count)
+               | _ ->
+                   let user = Hashtbl.find_exn t.users username in
+                   (username, Some user.current_role, count))
       in
-      let loser, losing_votes = List.hd_exn votes in
-      let loser = Hashtbl.find_exn t.users loser in
+      let loser, loser_role, losing_votes = List.hd_exn votes in
       let role_to_string role =
         match role with
-        | Role.Doppelganger (Some role) -> sprintf !"Doppelganger-%{Role}" role
-        | _ -> Role.to_string role
+        | None -> ""
+        | Some (Role.Doppelganger (Some role)) ->
+            sprintf !"(the Doppelganger-%{Role})" role
+        | Some role -> sprintf "(the %s)" (Role.to_string role)
       in
       let other_votes =
         match votes with
         | [] | [ _ ] -> []
         | _ :: votes ->
-            let users =
-              List.map votes ~f:(fun (u, n) -> (Hashtbl.find_exn t.users u, n))
-            in
             [
               Page.Element.Text "<hr></hr>";
               Text "Other players that received votes:";
               Text
                 (Html.to_string
                    (Html.ul []
-                      (List.map users ~f:(fun (user, votes) ->
+                      (List.map votes ~f:(fun (user, role, votes) ->
                            Html.li []
                              [
                                Html.text
-                                 (sprintf !"%s (%s): %n vote%s" user.username
-                                    (role_to_string user.current_role)
-                                    votes
+                                 (sprintf !"%s %s: %n vote%s" user
+                                    (role_to_string role) votes
                                     (if votes = 1 then "" else "s"));
                              ]))));
             ]
@@ -473,9 +514,9 @@ let get_page_for_user t (user : User.t) =
       [
         Page.Element.Centered_text
           (sprintf
-             !"%s (the %s) received the most votes (%n)."
-             loser.username
-             (role_to_string loser.current_role)
+             !"%s %s received the most votes (%n)."
+             loser
+             (role_to_string loser_role)
              losing_votes);
       ]
       @ other_votes
@@ -490,7 +531,7 @@ let get_page_for_user t (user : User.t) =
                          [
                            Html.text
                              (sprintf !"%s: %s" user.username
-                                (role_to_string user.current_role));
+                                (role_to_string (Some user.current_role)));
                          ]))));
           No_refresh;
         ]
@@ -515,6 +556,7 @@ let validate_input t (user : User.t) (input : Input.t) =
   | Vote -> (
       match input with
       | Choose_user [ user ] -> Hashtbl.mem t.users user
+      | Choose_no_werewolf -> true
       | _ -> false )
   | Results -> false
   | View_roles -> (
@@ -759,7 +801,9 @@ let rec maybe_change_phase t =
   | Vote ->
       let phase_over =
         Hashtbl.for_all t.users ~f:(fun user ->
-            match user.inputs with Choose_user [ _ ] :: _ -> true | _ -> false)
+            match user.inputs with
+            | (Choose_user [ _ ] | Choose_no_werewolf) :: _ -> true
+            | _ -> false)
       in
       if phase_over then (
         t.phase <- Results;
