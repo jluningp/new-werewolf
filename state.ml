@@ -1,5 +1,6 @@
 open Core
 open Shared
+module Game_code = String
 
 module Page = struct
   type t = Join | Setup | Play of Username.t | Default
@@ -8,7 +9,8 @@ end
 module Action = struct
   type t =
     | Create_game
-    | Join_game
+    | Join_game of Game_code.t
+    | New_game
     | Leave_game
     | Set_role of Role.t * int
     | Start_game
@@ -19,13 +21,15 @@ end
 module Join = struct
   let create_game =
     Html.div
-      [ ("id", "button"); ("onclick", "createGame()") ]
+      [ ("class", "button"); ("onclick", "createGame()") ]
       [ Html.text "GO" ]
 
   let join_game =
-    Html.div [ ("id", "button"); ("onclick", "joinGame()") ] [ Html.text "GO" ]
+    Html.div
+      [ ("class", "button"); ("onclick", "joinGame()") ]
+      [ Html.text "GO" ]
 
-  let get_page ~existing_game ~username =
+  let get_page ~username =
     let username = Option.value ~default:"" username in
     let username_input =
       Html.(
@@ -35,20 +39,25 @@ module Join = struct
             input
               [ ("type", "text"); ("id", "username"); ("value", username) ]
               [];
+            br;
           ])
+    in
+    let game_code_input =
+      Html.(
+        input [ ("type", "text"); ("id", "code"); ("placeholder", "CODE") ] [])
     in
     Html.div []
       [
         username_input;
         Html.br;
-        Html.div
-          [ ("style", "font-size:small;") ]
-          [
-            Html.text
-              "Press \"GO\" to join the game. If no game currently exists, one \
-               will be created.";
-          ];
-        (if existing_game then join_game else create_game);
+        Html.text "New Game: ";
+        create_game;
+        Html.br;
+        Html.br;
+        Html.text "Join Game: ";
+        game_code_input;
+        Html.text " ";
+        join_game;
       ]
     |> Html.to_string
 end
@@ -57,9 +66,10 @@ module Setup = struct
   type t = {
     mutable roles : (int * Role.t) list;
     mutable users : Username.t list;
+    game_code : Game_code.t;
   }
 
-  let create ~roles = { roles; users = [] }
+  let create ~roles ~game_code = { roles; users = []; game_code }
 
   let number_select t role ~is_admin =
     let open Html in
@@ -129,7 +139,9 @@ module Setup = struct
       let refresh = if is_admin then " (&#8635; page to update)" else "" in
       div []
         [
-          div [ ("style", "text-align:center") ] [ b [] [ text "New Game" ] ];
+          div
+            [ ("style", "text-align:center") ]
+            [ b [] [ text ("New Game: " ^ t.game_code) ] ];
           br;
           ( if is_admin then text "Select 3 more roles than players:"
           else text "Selecting roles:" );
@@ -173,52 +185,108 @@ module Setup = struct
       if count > 0 then t.roles <- (count, role) :: roles else t.roles <- roles
 end
 
-type status = No_game | Setup of Setup.t | Play of Werewolf.t
+type status = Setup of Setup.t | Play of Werewolf.t
+
+module Game_state = struct
+  type t = {
+    mutable status : status;
+    mutable last_game_roles : (int * Role.t) list;
+    mutable users : Username.t list;
+  }
+
+  let create ~creator ~code =
+    let setup = Setup.create ~roles:[] ~game_code:code in
+    let (_ : unit Or_error.t) = Setup.add_user setup creator in
+    let users = [ creator ] in
+    { status = Setup setup; last_game_roles = []; users }
+end
 
 type t = {
-  mutable status : status;
-  mutable last_game_roles : (int * Role.t) list;
+  games : Game_state.t Game_code.Table.t;
+  users : Game_code.t Username.Table.t;
 }
 
-let create () = { status = No_game; last_game_roles = [] }
+let create () =
+  { games = Game_code.Table.create (); users = Username.Table.create () }
+
+let get_game t username =
+  let%bind.Option username = username in
+  let%bind.Option game_code = Hashtbl.find t.users username in
+  Hashtbl.find t.games game_code
+
+let rec new_code t =
+  let code =
+    String.of_char_list
+      (List.init 4 ~f:(fun _ -> Char.of_int_exn (65 + Random.int 26)))
+  in
+  if Hashtbl.mem t.games code then new_code t else code
 
 let page t username =
-  match (t.status, username) with
-  | No_game, username -> Join.get_page ~existing_game:false ~username
-  | Setup _, None -> Join.get_page ~existing_game:true ~username:None
-  | Setup setup, Some username ->
-      if List.mem setup.users username ~equal:Username.equal then
-        Setup.get_page setup username
-      else Join.get_page ~existing_game:true ~username:(Some username)
-  | Play werewolf, Some username ->
-      Html.to_string (Shared.Page.to_html (Werewolf.get_page werewolf username))
-  | Play _, None -> ""
+  match (get_game t username, username) with
+  | None, _ | _, None -> Join.get_page ~username
+  | Some game, Some username -> (
+      match game.status with
+      | Setup setup -> Setup.get_page setup username
+      | Play werewolf ->
+          Html.to_string
+            (Shared.Page.to_html (Werewolf.get_page werewolf username)) )
 
 let action t action username =
-  match (t.status, action) with
-  | No_game, Action.Create_game ->
-      let setup = Setup.create ~roles:t.last_game_roles in
-      let (_ : unit Or_error.t) = Setup.add_user setup username in
-      t.status <- Setup setup
-  | Setup _, Create_game -> ()
-  | Setup setup, Join_game ->
-      let (_ : unit Or_error.t) = Setup.add_user setup username in
-      ()
-  | Setup setup, Leave_game ->
-      let (_ : unit Or_error.t) = Setup.remove_user setup username in
-      ()
-  | Setup setup, Set_role (role, count) -> Setup.set_role setup role count
-  | Setup setup, Start_game -> (
-      t.last_game_roles <- setup.roles;
-      let roles =
-        List.concat_map setup.roles ~f:(fun (n, role) ->
-            List.init n ~f:(fun _ -> role))
-      in
-      match Werewolf.create roles setup.users with
-      | Error _ -> ()
-      | Ok werewolf -> t.status <- Play werewolf )
-  | Play werewolf, Game_input input ->
-      let (_ : unit Or_error.t) = Werewolf.on_input werewolf username input in
-      ()
-  | _, End_game -> t.status <- No_game
-  | _ -> ()
+  match get_game t (Some username) with
+  | None -> (
+      match action with
+      | Action.Create_game ->
+          let game_code = new_code t in
+          let game = Game_state.create ~creator:username ~code:game_code in
+          Hashtbl.set t.games ~key:game_code ~data:game;
+          Hashtbl.set t.users ~key:username ~data:game_code
+      | Join_game code -> (
+          match Hashtbl.find t.games code with
+          | None -> ()
+          | Some game -> (
+              match game.status with
+              | Play _ -> ()
+              | Setup setup ->
+                  let (_ : unit Or_error.t) = Setup.add_user setup username in
+                  ();
+                  game.users <- username :: game.users;
+                  Hashtbl.set t.users ~key:username ~data:code ) )
+      | Leave_game | Set_role _ | Start_game | Game_input _ | End_game
+      | New_game ->
+          () )
+  | Some game -> (
+      match (game.status, action) with
+      | Setup setup, Leave_game ->
+          let game_code = Hashtbl.find_exn t.users username in
+          let (_ : unit Or_error.t) = Setup.remove_user setup username in
+          game.users <-
+            List.filter game.users ~f:(fun user ->
+                not (String.equal user username));
+          Hashtbl.remove t.users username;
+          if List.is_empty game.users then Hashtbl.remove t.games game_code
+      | Setup setup, Set_role (role, count) -> Setup.set_role setup role count
+      | Setup setup, Start_game -> (
+          game.last_game_roles <- setup.roles;
+          let roles =
+            List.concat_map setup.roles ~f:(fun (n, role) ->
+                List.init n ~f:(fun _ -> role))
+          in
+          match Werewolf.create roles setup.users with
+          | Error _ -> ()
+          | Ok werewolf -> game.status <- Play werewolf )
+      | Play werewolf, Game_input input ->
+          let (_ : unit Or_error.t) =
+            Werewolf.on_input werewolf username input
+          in
+          ()
+      | _, End_game ->
+          let game_code = Hashtbl.find_exn t.users username in
+          List.iter game.users ~f:(Hashtbl.remove t.users);
+          Hashtbl.remove t.games game_code
+      | _, New_game ->
+          let game_code = Hashtbl.find_exn t.users username in
+          let setup = Setup.create ~roles:game.last_game_roles ~game_code in
+          List.iter (List.rev game.users) ~f:(fun user ->
+              ignore (Setup.add_user setup user : unit Or_error.t));
+          game.status <- Setup setup
+      | _ -> () )

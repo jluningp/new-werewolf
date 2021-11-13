@@ -44,7 +44,13 @@ function updateUsername () {
 }
 
 function replaceContent (content) {
-    document.getElementById("game").innerHTML = content;
+    var el = document.createElement( 'body' );
+    el.innerHTML = content;		
+    if (document.getElementById("game").innerHTML == el.innerHTML) {
+	
+    } else {
+	document.getElementById("game").innerHTML = content;
+    }
     var refresh = document.getElementById("refreshpage");
     if (refresh) {
 	setTimeout(getUpdatedPage, refresh.innerHTML)
@@ -73,11 +79,16 @@ function createGame () {
 
 function joinGame () {
     updateUsername();
-    get("action/join?" + usernameQuery(), getUpdatedPage);
+    var code = document.getElementById("code").value;
+    get("action/join?" + usernameQuery() + "&code=" + code, getUpdatedPage);
 }
     
 function startGame () {
     get("action/start_game?" + usernameQuery(), getUpdatedPage);
+}
+
+function newGame () {
+    get("action/new_game?" + usernameQuery(), getUpdatedPage);
 }
 
 function ack () {
