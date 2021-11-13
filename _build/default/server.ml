@@ -29,8 +29,9 @@ module Query = struct
         let%map username = get_username uri in
         Action { username; action = Create_game }
     | "/action/join" ->
-        let%map username = get_username uri in
-        Action { username; action = Join_game }
+        let%bind username = get_username uri in
+        let%map game_code = Uri.get_query_param uri "code" in
+        Action { username; action = Join_game game_code }
     | "/action/leave" ->
         let%map username = get_username uri in
         Action { username; action = Leave_game }
@@ -66,6 +67,9 @@ module Query = struct
     | "/action/end_game" ->
         let%map username = get_username uri in
         Action { username; action = End_game }
+    | "/action/new_game" ->
+        let%map username = get_username uri in
+        Action { username; action = New_game }
     | filename ->
         let filename = String.drop_prefix filename 1 in
         if Set.mem available_files filename then Some (File filename) else None

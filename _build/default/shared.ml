@@ -61,6 +61,7 @@ module Page = struct
   module Element = struct
     type t =
       | Text of string
+      | Html of string
       | Centered_text of string
       | Cards of Role.t list
       | Choose_user of {
@@ -74,13 +75,14 @@ module Page = struct
       | No_refresh
 
     let is_action = function
-      | Text _ | Centered_text _ | Cards _ -> false
+      | Text _ | Html _ | Centered_text _ | Cards _ -> false
       | Choose_user _ | Ack_button | Vote_button | No_refresh -> true
 
     let to_html element =
       let open Html in
       match element with
       | Text str -> p [] [ text str ]
+      | Html str -> text str
       | Centered_text str ->
           div [ ("style", "text-align:center;") ] [ text str ]
       | Cards [] -> p [] [ text "No Cards" ]
@@ -151,7 +153,7 @@ module Page = struct
                 [ ("id", "button"); ("onclick", "vote()") ]
                 [ text "Ready to Vote" ];
             ]
-      | No_refresh -> div [] []
+      | No_refresh -> text ""
   end
 
   type t = Element.t list
