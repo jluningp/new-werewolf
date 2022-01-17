@@ -93,6 +93,7 @@ type t = {
   random_cache : Random_cache.t;
   mutable center_cards : Role.t list;
   mutable phase : Phase.t;
+  admin : Username.t;
 }
 
 let center_card_username = "CENTER-CARD-231804952714"
@@ -112,8 +113,8 @@ let assign_roles roles users =
       in
       Ok (center_cards, user_roles)
 
-let create roles users =
-  match assign_roles roles users with
+let create roles usernames =
+  match assign_roles roles usernames with
   | Error err -> Error err
   | Ok (center_cards, user_roles) -> (
       match Username.Table.of_alist user_roles with
@@ -126,6 +127,7 @@ let create roles users =
               random_cache = Random_cache.create ();
               phase = View_roles;
               center_cards;
+              admin = List.last_exn usernames;
             } )
 
 let is_users_turn night_phase (user : User.t) =
@@ -521,7 +523,7 @@ let get_page_for_user t (user : User.t) =
       ]
       @ other_votes
       @ [
-          Text "<hr></hr>";
+          Page.Element.Text "<hr></hr>";
           Text "In the end, your cards were:";
           Text
             (Html.to_string
@@ -533,8 +535,16 @@ let get_page_for_user t (user : User.t) =
                              (sprintf !"%s: %s" user.username
                                 (role_to_string (Some user.current_role)));
                          ]))));
-          No_refresh;
         ]
+      @
+      if String.equal user.username t.admin then
+        [
+          Page.Element.No_refresh;
+          Html
+            "<div style=\"text-align:center;\"><div id=button \
+             onclick=\"newGame()\">New Game</div></div>";
+        ]
+      else []
   | Night night_phase -> (
       if not (is_users_turn night_phase user) then [ Text "Waiting" ]
       else
