@@ -14,6 +14,10 @@ module Role : sig
     | Tanner
     | Minion
     | Drunk
+    | Hunter
+    | Mystic_wolf
+    | Dream_wolf
+    | Alpha_wolf
     | Doppelganger of t option
   [@@deriving sexp, equal, enumerate]
 
