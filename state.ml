@@ -121,9 +121,10 @@ module Setup = struct
 
   let role_input t role ~is_admin =
     match role with
-    | Role.Werewolf | Villager | Insomniac | Mason | Seer | Tanner | Minion ->
+    | Role.Werewolf | Mystic_wolf | Dream_wolf | Villager | Insomniac | Mason
+    | Seer | Tanner | Minion | Hunter ->
         number_select t role ~is_admin
-    | Robber | Troublemaker | Drunk | Doppelganger _ ->
+    | Alpha_wolf | Robber | Troublemaker | Drunk | Doppelganger _ ->
         single_select t role ~is_admin
 
   let get_page t user =

@@ -14,6 +14,10 @@ module Role = struct
     | Tanner
     | Minion
     | Drunk
+    | Hunter
+    | Mystic_wolf
+    | Dream_wolf
+    | Alpha_wolf
     | Doppelganger of t option
   [@@deriving sexp, equal]
 
@@ -29,6 +33,10 @@ module Role = struct
       Tanner;
       Minion;
       Drunk;
+      Hunter;
+      Mystic_wolf;
+      Dream_wolf;
+      Alpha_wolf;
       Doppelganger None;
     ]
 
@@ -44,16 +52,26 @@ module Role = struct
     | Minion -> "images/minions.png"
     | Drunk -> "images/drunks.png"
     | Tanner -> "images/tanners.png"
+    | Hunter -> "images/hunter.jpeg"
+    | Mystic_wolf -> "images/mystic_wolf.png"
+    | Dream_wolf -> "images/dream_wolf.png"
+    | Alpha_wolf -> "images/alpha_wolf.png"
     | Doppelganger _ -> "images/doppelgangers.png"
 
   let of_string str =
     match str with
     | "Doppelganger" -> Doppelganger None
+    | "Dream Wolf" -> Dream_wolf
+    | "Mystic Wolf" -> Mystic_wolf
+    | "Alpha Wolf" -> Alpha_wolf
     | _ -> t_of_sexp (Sexp.of_string str)
 
   let to_string t =
     match t with
     | Doppelganger _ -> "Doppelganger"
+    | Dream_wolf -> "Dream Wolf"
+    | Mystic_wolf -> "Mystic Wolf"
+    | Alpha_wolf -> "Alpha Wolf"
     | _ -> Sexp.to_string (sexp_of_t t)
 end
 
