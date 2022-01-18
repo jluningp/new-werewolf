@@ -27,6 +27,9 @@ module Role = struct
     [
       Robber;
       Werewolf;
+      Mystic_wolf;
+      Dream_wolf;
+      Alpha_wolf;
       Seer;
       Troublemaker;
       Villager;
@@ -36,9 +39,6 @@ module Role = struct
       Minion;
       Drunk;
       Hunter;
-      Mystic_wolf;
-      Dream_wolf;
-      Alpha_wolf;
       Doppelganger None;
     ]
 
