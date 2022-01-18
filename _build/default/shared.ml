@@ -19,7 +19,9 @@ module Role = struct
     | Dream_wolf
     | Alpha_wolf
     | Doppelganger of t option
-  [@@deriving sexp, equal]
+  [@@deriving sexp, compare]
+
+  let equal v1 v2 = (compare v1 v2) = 0
 
   let all =
     [

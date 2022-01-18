@@ -19,7 +19,9 @@ module Role : sig
     | Dream_wolf
     | Alpha_wolf
     | Doppelganger of t option
-  [@@deriving sexp, equal, enumerate]
+  [@@deriving sexp, compare, enumerate]
+
+  val equal : t -> t -> bool
 
   val card_image : t -> string
 

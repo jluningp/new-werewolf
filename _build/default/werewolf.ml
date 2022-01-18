@@ -106,12 +106,12 @@ let center_card_users =
 let assign_roles roles users =
   let users = List.permute (users @ center_card_users) in
   match List.zip users roles with
-  | Unequal_lengths -> Or_error.error_string "Incorrect number of roles."
-  | Ok role_assignments ->
+  | None -> Or_error.error_string "Incorrect number of roles."
+  | Some role_assignments ->
       let center_cards, user_roles =
         List.partition_map role_assignments ~f:(fun (user, role) ->
-            if String.equal user center_card_username then First role
-            else Second (user, role))
+            if String.equal user center_card_username then `Fst role
+            else `Snd (user, role))
       in
       Ok (center_cards, user_roles)
 

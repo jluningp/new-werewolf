@@ -90,12 +90,12 @@ let server port () =
             Server.respond_string ~status:`OK page
         | File file -> Server.respond_with_file file )
   in
-  let%bind t =
+  let%bind _t =
     Server.create ~mode:`TCP ~on_handler_error:`Ignore
-      (Async_unix.Tcp.Where_to_listen.of_port port)
+      (Async.Tcp.Where_to_listen.of_port port)
       callback
   in
-  printf "Serving at port %n" (Server.listening_on t);
+  printf "Serving at port %n" port;
   Deferred.never ()
 
 let () =
