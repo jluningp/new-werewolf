@@ -74,22 +74,26 @@ module Setup = struct
   let number_select t role ~is_admin =
     let open Html in
     let roles =
-      List.find_map t.roles ~f:(fun (n, r) ->
-          if Role.equal role r then Some (Int.to_string n) else None)
-      |> Option.value ~default:"0"
+      List.filter_map t.roles ~f:(fun (n, r) ->
+          match (role, r) with
+          | Role.Robber _, Robber _ -> Some n
+          | Troublemaker _, Troublemaker _ -> Some n
+          | Drunk _, Drunk _ -> Some n
+          | _, _ -> if Role.equal role r then Some n else None)
+      |> List.fold ~init:0 ~f:( + ) |> Int.to_string
     in
-    let role_str = Role.to_string role in
+    let role_str = Role.to_string_unnumbered role in
     div []
       [
         label [ ("for", role_str) ] [ text (role_str ^ ": ") ];
         input
-          ( [
-              ("type", "number");
-              ("id", role_str);
-              ("value", roles);
-              ("onchange", "changeNumberedRole('" ^ role_str ^ "')");
-            ]
-          @ if is_admin then [] else [ ("disabled", "") ] )
+          ([
+             ("type", "number");
+             ("id", role_str);
+             ("value", roles);
+             ("onchange", "changeNumberedRole('" ^ role_str ^ "')");
+           ]
+          @ if is_admin then [] else [ ("disabled", "") ])
           [];
       ]
 
@@ -103,17 +107,18 @@ module Setup = struct
     div []
       [
         label [ ("for", role_str) ] [ text (role_str ^ ":  ") ];
-        label [ ("class", "switch") ]
+        label
+          [ ("class", "switch") ]
           [
             input
-              ( [
-                  ("type", "checkbox");
-                  ("id", role_str);
-                  ("onchange", "changeSingleRole('" ^ role_str ^ "')");
-                  ("type", "checkbox");
-                ]
+              ([
+                 ("type", "checkbox");
+                 ("id", role_str);
+                 ("onchange", "changeSingleRole('" ^ role_str ^ "')");
+                 ("type", "checkbox");
+               ]
               @ (if is_admin then [] else [ ("disabled", "") ])
-              @ if checked then [ ("checked", "") ] else [] )
+              @ if checked then [ ("checked", "") ] else [])
               [];
             span [ ("class", "slider round") ] [];
           ];
@@ -122,10 +127,9 @@ module Setup = struct
   let role_input t role ~is_admin =
     match role with
     | Role.Werewolf | Mystic_wolf | Dream_wolf | Villager | Insomniac | Mason
-    | Seer | Tanner | Minion | Hunter ->
+    | Seer | Tanner | Minion | Hunter | Robber _ | Troublemaker _ | Drunk _ ->
         number_select t role ~is_admin
-    | Alpha_wolf | Robber | Troublemaker | Drunk | Doppelganger _ ->
-        single_select t role ~is_admin
+    | Alpha_wolf | Doppelganger _ -> single_select t role ~is_admin
 
   let get_page t user =
     let html =
@@ -144,22 +148,22 @@ module Setup = struct
             [ ("style", "text-align:center") ]
             [ b [] [ text ("New Game: " ^ t.game_code) ] ];
           br;
-          ( if is_admin then text "Select 3 more roles than players:"
-          else text "Selecting roles:" );
+          (if is_admin then text "Select 3 more roles than players:"
+          else text "Selecting roles:");
           br;
           div [ ("style", "padding-left:0.3em") ] inputs;
           div
             [ ("style", "font-size:.7em; color:gray;") ]
             [ br; text ("Players" ^ refresh ^ ": " ^ players) ];
-          ( if is_admin then
-            div
-              [ ("style", "text-align:center") ]
-              [
-                div
-                  [ ("id", "button"); ("onclick", "startGame()") ]
-                  [ text "Start Game" ];
-              ]
-          else refresh_page );
+          (if is_admin then
+           div
+             [ ("style", "text-align:center") ]
+             [
+               div
+                 [ ("id", "button"); ("onclick", "startGame()") ]
+                 [ text "Start Game" ];
+             ]
+          else refresh_page);
         ]
     in
     Html.to_string html
@@ -169,7 +173,7 @@ module Setup = struct
       Or_error.error_string "Duplicate username"
     else (
       t.users <- user :: t.users;
-      Ok () )
+      Ok ())
 
   let remove_user t user =
     t.users <-
@@ -177,13 +181,42 @@ module Setup = struct
           not (Username.equal user username));
     Ok ()
 
-  let set_role t role count =
+  let set_numbered_role t role count =
+    if count >= 0 then
+      let roles =
+        List.filter t.roles ~f:(fun (_, other_role) ->
+            match (role, other_role) with
+            | Role.Troublemaker _, Troublemaker _ -> false
+            | Robber _, Robber _ -> false
+            | Drunk _, Drunk _ -> false
+            | _ -> true)
+      in
+      let numbered_role =
+        List.init count ~f:(fun i ->
+            match role with
+            | Role.Troublemaker _ -> (1, Role.Troublemaker i)
+            | Robber _ -> (1, Robber i)
+            | Drunk _ -> (1, Drunk i)
+            | _ ->
+                failwith
+                  "Tried to set numbered role, but role is not robber, drunk, \
+                   or troublemaker")
+      in
+      if count > 0 then t.roles <- numbered_role @ roles else t.roles <- roles
+
+  let set_unnumbered_role t role count =
     if count >= 0 then
       let roles =
         List.filter t.roles ~f:(fun (_, other_role) ->
             not (Role.equal role other_role))
       in
       if count > 0 then t.roles <- (count, role) :: roles else t.roles <- roles
+
+  let set_role t role count =
+    match role with
+    | Role.Troublemaker _ | Role.Robber _ | Role.Drunk _ ->
+        set_numbered_role t role count
+    | _ -> set_unnumbered_role t role count
 end
 
 type status = Setup of Setup.t | Play of Werewolf.t
@@ -231,7 +264,7 @@ let page t username =
       | Setup setup -> Setup.get_page setup username
       | Play werewolf ->
           Html.to_string
-            (Shared.Page.to_html (Werewolf.get_page werewolf username)) )
+            (Shared.Page.to_html (Werewolf.get_page werewolf username)))
 
 let action t action username =
   match get_game t (Some username) with
@@ -252,10 +285,10 @@ let action t action username =
                   let (_ : unit Or_error.t) = Setup.add_user setup username in
                   ();
                   game.users <- username :: game.users;
-                  Hashtbl.set t.users ~key:username ~data:code ) )
+                  Hashtbl.set t.users ~key:username ~data:code))
       | Leave_game | Set_role _ | Start_game | Game_input _ | End_game
       | New_game ->
-          () )
+          ())
   | Some game -> (
       match (game.status, action) with
       | Setup setup, Leave_game ->
@@ -275,7 +308,7 @@ let action t action username =
           in
           match Werewolf.create roles setup.users with
           | Error _ -> ()
-          | Ok werewolf -> game.status <- Play werewolf )
+          | Ok werewolf -> game.status <- Play werewolf)
       | Play werewolf, Game_input input ->
           let (_ : unit Or_error.t) =
             Werewolf.on_input werewolf username input
@@ -291,4 +324,4 @@ let action t action username =
           List.iter (List.rev game.users) ~f:(fun user ->
               ignore (Setup.add_user setup user : unit Or_error.t));
           game.status <- Setup setup
-      | _ -> () )
+      | _ -> ())

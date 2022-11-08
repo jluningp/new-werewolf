@@ -4,16 +4,16 @@ module Html = Html
 
 module Role : sig
   type t =
-    | Robber
+    | Robber of int
     | Werewolf
     | Seer
-    | Troublemaker
+    | Troublemaker of int
     | Villager
     | Insomniac
     | Mason
     | Tanner
     | Minion
-    | Drunk
+    | Drunk of int
     | Hunter
     | Mystic_wolf
     | Dream_wolf
@@ -22,11 +22,9 @@ module Role : sig
   [@@deriving sexp, compare, enumerate]
 
   val equal : t -> t -> bool
-
   val card_image : t -> string
-
   val to_string : t -> string
-
+  val to_string_unnumbered : t -> string
   val of_string : string -> t
 end
 

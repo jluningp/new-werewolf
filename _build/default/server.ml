@@ -95,7 +95,7 @@ let server port () =
       (Async.Tcp.Where_to_listen.of_port port)
       callback
   in
-  printf "Serving at port %n" port;
+  (* printf "Serving at port %n" (Server.listening_on t); *) 
   Deferred.never ()
 
 let () =
