@@ -1087,8 +1087,8 @@ let rec maybe_change_phase t =
         |> Hashtbl.is_empty
       in
       let robber_count =
-        List.count (Hashtbl.data t.users) ~f:(fun user ->
-            match user.original_role with Robber _ -> true | _ -> false)
+        List.count t.all_roles ~f:(fun role ->
+            match role with Robber _ -> true | _ -> false)
       in
       let phase =
         if n >= robber_count - 1 then Phase.Night (Troublemaker 0)
@@ -1117,8 +1117,8 @@ let rec maybe_change_phase t =
         |> Hashtbl.is_empty
       in
       let troublemaker_count =
-        List.count (Hashtbl.data t.users) ~f:(fun user ->
-            match user.original_role with Troublemaker _ -> true | _ -> false)
+        List.count t.all_roles ~f:(fun role ->
+            match role with Troublemaker _ -> true | _ -> false)
       in
       let phase =
         if n >= troublemaker_count - 1 then Phase.Night Dawn
