@@ -244,8 +244,9 @@ let create () =
   { games = Game_code.Table.create (); users = Username.Table.create () }
 
 let get_game t username =
-  let%bind.Option username = username in
-  let%bind.Option game_code = Hashtbl.find t.users username in
+  let open Option.Let_syntax in 
+  let%bind username = username in
+  let%bind game_code = Hashtbl.find t.users username in
   Hashtbl.find t.games game_code
 
 let rec new_code t =

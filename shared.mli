@@ -19,8 +19,9 @@ module Role : sig
     | Dream_wolf
     | Alpha_wolf
     | Doppelganger of t option
-  [@@deriving sexp, equal, enumerate]
+  [@@deriving sexp, compare, enumerate]
 
+  val equal : t -> t -> bool
   val card_image : t -> string
   val to_string : t -> string
   val to_string_unnumbered : t -> string
@@ -34,12 +35,11 @@ module Page : sig
       | Html of string
       | Centered_text of string
       | Cards of Role.t list
-      | Choose_user of {
-          choose_this_many : int;
-          users : Username.t list;
-          or_center : bool;
-          or_no_werewolf : bool;
-        }
+      | Choose_user of
+          { choose_this_many : int
+          ; users : Username.t list
+          ; or_center : bool
+          ; or_no_werewolf : bool }
       | Ack_button
       | Vote_button
       | No_refresh

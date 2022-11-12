@@ -1,4 +1,4 @@
 (executable
  (name server)
- (preprocess (pps ppx_jane))
+ (preprocess (pps ppx_jane ppx_compare))
  (libraries core async cohttp cohttp-async))
