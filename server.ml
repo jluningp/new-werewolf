@@ -70,6 +70,18 @@ module Query = struct
     | "/action/new_game" ->
         let%map username = get_username uri in
         Action {username; action = New_game}
+    | "/action/to_settings" ->
+        let%map username = get_username uri in
+        Action {username; action = Set_page `Settings}
+    | "/action/to_setup" ->
+        let%map username = get_username uri in
+        Action {username; action = Set_page `Setup}
+    | "/action/set_setting" ->
+        let%bind username = get_username uri in
+        let%bind tag = Uri.get_query_param uri "setting" in
+        let%bind is_on = Uri.get_query_param uri "is_on" in
+        let%map is_on = Option.try_with (fun () -> Bool.of_string is_on) in
+        Action {username; action = Set_setting {tag; is_on}}
     | filename ->
         let filename = String.drop_prefix filename 1 in
         if Set.mem available_files filename then Some (File filename) else None

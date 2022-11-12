@@ -145,4 +145,17 @@ function leaveGame() {
     get("action/leave?" + usernameQuery (), getUpdatedPage);
 }
 
+function toSettings () {
+    get("action/to_settings?" + usernameQuery (), getUpdatedPage)
+}
+
+function toSetup () {
+    get("action/to_setup?" + usernameQuery (), getUpdatedPage)
+}
+
+function setSetting(setting) {
+    var checked = document.getElementById(setting).checked;
+    get("action/set_setting?" + usernameQuery () + "&" + "setting=" + setting + "&" + "is_on=" + checked, getUpdatedPage)
+}
+
 getUpdatedPage();

@@ -4,19 +4,24 @@ open Shared
 module Random_cache : sig
   type t
 
-  val create : unit -> t
+  val create : lone_werewolf_sees_non_werewolf_center_card:bool -> t
   val drunk_card : t -> Username.t -> int
-  val werewolf_sees_card : t -> Username.t -> int
+
+  val werewolf_sees_card :
+    t -> Username.t -> non_werewolf_indices:int list -> int
+
   val seer_doesnt_see_card : t -> Username.t -> int
 end = struct
   type t =
-    { seer_doesnt_see_card : int Username.Table.t
+    { lone_werewolf_sees_non_werewolf_center_card : bool
+    ; seer_doesnt_see_card : int Username.Table.t
     ; seer_doesnt_see_card__if_werewolf_card : int Username.Table.t
     ; werewolf_sees_card : int Username.Table.t
     ; drunk_card : int Username.Table.t }
 
-  let create () =
-    { seer_doesnt_see_card = Username.Table.create ()
+  let create ~lone_werewolf_sees_non_werewolf_center_card =
+    { lone_werewolf_sees_non_werewolf_center_card
+    ; seer_doesnt_see_card = Username.Table.create ()
     ; seer_doesnt_see_card__if_werewolf_card = Username.Table.create ()
     ; werewolf_sees_card = Username.Table.create ()
     ; drunk_card = Username.Table.create () }
@@ -24,9 +29,12 @@ end = struct
   let drunk_card t user =
     Hashtbl.find_or_add t.drunk_card user ~default:(fun () -> Random.int 3)
 
-  let werewolf_sees_card t user =
+  let werewolf_sees_card t user ~non_werewolf_indices =
     Hashtbl.find_or_add t.werewolf_sees_card user ~default:(fun () ->
-        Random.int 3 )
+        if t.lone_werewolf_sees_non_werewolf_center_card then
+          List.nth_exn non_werewolf_indices
+            (Random.int (List.length non_werewolf_indices))
+        else Random.int 3 )
 
   let seer_doesnt_see_card t user =
     Hashtbl.find_or_add t.seer_doesnt_see_card user ~default:(fun () ->
@@ -87,7 +95,8 @@ type t =
   ; mutable center_werewolf_card : Role.t
   ; mutable phase : Phase.t
   ; admin : Username.t
-  ; all_roles : Role.t list }
+  ; all_roles : Role.t list
+  ; settings : Settings.t }
 
 let center_card_username = "CENTER-CARD-231804952714"
 
@@ -106,7 +115,7 @@ let assign_roles roles users =
       in
       Ok (center_cards, user_roles)
 
-let create roles usernames =
+let create (settings : Settings.t) roles usernames =
   match assign_roles roles usernames with
   | Error err -> Error err
   | Ok (center_cards, user_roles) -> (
@@ -116,12 +125,16 @@ let create roles usernames =
         Ok
           { users =
               Hashtbl.mapi users ~f:(fun ~key ~data -> User.create key data)
-          ; random_cache = Random_cache.create ()
+          ; random_cache =
+              Random_cache.create
+                ~lone_werewolf_sees_non_werewolf_center_card:
+                  settings.lone_werewolf_sees_non_werewolf_center_card
           ; phase = View_roles
           ; center_cards
           ; center_werewolf_card = Werewolf
           ; admin = List.last_exn usernames
-          ; all_roles = roles } )
+          ; all_roles = roles
+          ; settings } )
 
 let is_users_turn night_phase (user : User.t) =
   match (night_phase, user.original_role) with
@@ -143,18 +156,22 @@ let is_users_turn night_phase (user : User.t) =
   | Doppelganger_drunk, Doppelganger (Some (Drunk _)) -> true
   | _, _ -> false
 
-let role_to_string_unnumbered_if_unique t role =
-  let role_count =
-    List.count t.all_roles ~f:(fun other_role ->
-        match (role, other_role) with
-        | Role.Doppelganger _, Doppelganger _ -> true
-        | Robber _, Robber _ -> true
-        | Troublemaker _, Troublemaker _ -> true
-        | Drunk _, Drunk _ -> true
-        | _, _ -> Role.equal role other_role )
-  in
-  if role_count = 1 then Role.to_string_unnumbered role
-  else Role.to_string role
+let role_to_string_unnumbered_if_unique ?(ignore_settings = false)
+    ?(never_number = false) t role =
+  if ((not t.settings.show_role_number) && not ignore_settings) || never_number
+  then Role.to_string_unnumbered role
+  else
+    let role_count =
+      List.count t.all_roles ~f:(fun other_role ->
+          match (role, other_role) with
+          | Role.Doppelganger _, Doppelganger _ -> true
+          | Robber _, Robber _ -> true
+          | Troublemaker _, Troublemaker _ -> true
+          | Drunk _, Drunk _ -> true
+          | _, _ -> Role.equal role other_role )
+    in
+    if role_count = 1 then Role.to_string_unnumbered role
+    else Role.to_string role
 
 let get_page_for_insomniac t (user : User.t) =
   match user.inputs with
@@ -290,8 +307,20 @@ let what_werewolf_sees t (user : User.t) =
   in
   match other_werewolves with
   | [] ->
+      let non_werewolf_indices =
+        let indices =
+          List.filter_mapi t.center_cards ~f:(fun i card ->
+              if Role.equal Werewolf card then None else Some i )
+        in
+        (* If all center cards are werewolves, give up and allow
+           the werewolf to see a werewolf. *)
+        match indices with
+        | [] -> List.mapi t.center_cards ~f:(fun i _ -> i)
+        | _ -> indices
+      in
       let card =
         Random_cache.werewolf_sees_card t.random_cache user.username
+          ~non_werewolf_indices
       in
       let center_cards =
         List.filteri t.center_cards ~f:(fun i _ -> i = card)
@@ -454,13 +483,15 @@ let get_results_page t (user : User.t) =
                (username, Some user.current_role, count) )
   in
   let loser, loser_role, losing_votes = List.hd_exn votes in
-  let role_to_string role =
+  let role_to_string ?ignore_settings role =
     match role with
     | None -> ""
     | Some (Role.Doppelganger (Some role)) ->
-        sprintf !"(the Doppelganger-%{Role})" role
+        sprintf !"(the Doppelganger-%s)"
+          (role_to_string_unnumbered_if_unique ?ignore_settings t role)
     | Some role ->
-        sprintf "(the %s)" (role_to_string_unnumbered_if_unique t role)
+        sprintf "(the %s)"
+          (role_to_string_unnumbered_if_unique ?ignore_settings t role)
   in
   let hunter_vote =
     let votes =
@@ -528,18 +559,25 @@ let get_results_page t (user : User.t) =
                    Html.li []
                      [ Html.text
                          (sprintf !"%s: %s" user.username
-                            (role_to_string (Some user.current_role))) ] ))))
+                            (role_to_string (Some user.current_role)
+                               ~ignore_settings:true)) ] ))))
     ; Text
         (sprintf
-           !"Center cards: %s, and %{Role}"
+           !"Center cards: %s, and %s"
            (String.concat ~sep:", "
               (List.map
-                 ~f:(role_to_string_unnumbered_if_unique t)
+                 ~f:
+                   (role_to_string_unnumbered_if_unique t ~ignore_settings:true)
                  (List.tl_exn t.center_cards)))
-           (List.hd_exn t.center_cards)) ]
+           (role_to_string_unnumbered_if_unique t
+              (List.hd_exn t.center_cards)
+              ~ignore_settings:true)) ]
   @ ( if is_alpha_wolf then
       [ Page.Element.Text
-          (sprintf !"Center werewolf card: %{Role}" t.center_werewolf_card) ]
+          (sprintf
+             !"Center werewolf card: %s"
+             (role_to_string_unnumbered_if_unique t t.center_werewolf_card
+                ~ignore_settings:true)) ]
     else [] )
   @
   if String.equal user.username t.admin then
@@ -577,7 +615,8 @@ let get_page_for_user t (user : User.t) =
             Hashtbl.data t.users |> List.map ~f:(fun user -> user.current_role)
           in
           t.center_cards @ user_roles
-          |> List.map ~f:(role_to_string_unnumbered_if_unique t)
+          |> List.map
+               ~f:(role_to_string_unnumbered_if_unique t ~never_number:true)
           |> List.map ~f:(fun r -> (r, ()))
           |> String.Map.of_alist_multi |> Map.map ~f:List.length
           |> Map.to_alist
@@ -706,7 +745,9 @@ let record_werewolf_action t user user_inputs input =
     match what_werewolf_sees t user with
     | `Center_cards [c1] ->
         User.record_action user "Saw that you were the lone werewolf." ;
-        User.record_action user !"Saw the %{Role} in the center" c1
+        User.record_action user
+          !"Saw the %s in the center"
+          (role_to_string_unnumbered_if_unique t c1)
     | `Center_cards _ -> ()
     | `Other_werewolves werewolves -> (
       match werewolves with
@@ -724,8 +765,8 @@ let record_action t (user : User.t) (input : Input.t) =
   | Day | Vote | Results -> ()
   | View_roles ->
       User.record_action user
-        !"Saw that your original card was %{Role}"
-        user.original_role
+        !"Saw that your original card was %s"
+        (role_to_string_unnumbered_if_unique t user.original_role)
   | Night phase -> (
       if not (is_users_turn phase user) then ()
       else
@@ -749,8 +790,8 @@ let record_action t (user : User.t) (input : Input.t) =
               User.record_action user !"Robbed %s" username
           | [Choose_user _; Ack], Ack ->
               User.record_action user
-                !"Saw that your new card was %{Role}"
-                user.current_role
+                !"Saw that your new card was %s"
+                (role_to_string_unnumbered_if_unique t user.current_role)
           | _ -> () )
         | Werewolf -> record_werewolf_action t user user_inputs input
         | Mystic_wolf -> (
@@ -758,9 +799,9 @@ let record_action t (user : User.t) (input : Input.t) =
             match (user_inputs, input) with
             | [Ack; Ack], Choose_user [username] ->
                 let other_user = Hashtbl.find_exn t.users username in
-                User.record_action user
-                  !"Saw that %s was the %{Role}"
-                  username other_user.current_role
+                User.record_action user !"Saw that %s was the %s" username
+                  (role_to_string_unnumbered_if_unique t
+                     other_user.current_role)
             | _ -> () )
         | Alpha_wolf -> (
             record_werewolf_action t user user_inputs input ;
@@ -795,8 +836,10 @@ let record_action t (user : User.t) (input : Input.t) =
               User.record_action user "Chose to view two center cards"
           | [Choose_user [username]; Ack], Ack ->
               User.record_action user
-                !"Saw that %s's card was %{Role}"
-                username (Hashtbl.find_exn t.users username).current_role
+                !"Saw that %s's card was %s"
+                username
+                (role_to_string_unnumbered_if_unique t
+                   (Hashtbl.find_exn t.users username).current_role)
           | [View_center_cards; Ack], Ack -> (
               let center_cards =
                 List.filteri t.center_cards ~f:(fun idx _ ->
@@ -807,8 +850,9 @@ let record_action t (user : User.t) (input : Input.t) =
               match center_cards with
               | [c1; c2] ->
                   User.record_action user
-                    !"Saw two of the center cards: %{Role} and %{Role}"
-                    c1 c2
+                    !"Saw two of the center cards: %s and %s"
+                    (role_to_string_unnumbered_if_unique t c1)
+                    (role_to_string_unnumbered_if_unique t c2)
               | _ -> () )
           | _ -> () )
         | Troublemaker _ -> (
@@ -843,23 +887,25 @@ let record_action t (user : User.t) (input : Input.t) =
           match (user_inputs, input) with
           | [Ack], Ack ->
               User.record_action user
-                !"Saw that your card was now %{Role}"
-                user.current_role
+                !"Saw that your card was now %s"
+                (role_to_string_unnumbered_if_unique t user.current_role)
           | _ -> () )
         | Drunk _ -> (
           match (user_inputs, input) with
           | [Ack], Ack ->
               User.record_action user "Swapped your card with a center card" ;
               User.record_action user
-                !"Saw that your card was now %{Role}"
-                user.current_role
+                !"Saw that your card was now %s"
+                (role_to_string_unnumbered_if_unique t user.current_role)
           | _ -> () )
         | Doppelganger None -> (
           match (user_inputs, input) with
           | [Ack], Choose_user [username] ->
               User.record_action user
-                !"Assumed %s's role: the %{Role}"
-                username (Hashtbl.find_exn t.users username).current_role
+                !"Assumed %s's role: the %s"
+                username
+                (role_to_string_unnumbered_if_unique t
+                   (Hashtbl.find_exn t.users username).current_role)
           | _ -> () )
         | Doppelganger (Some _) | Villager | Tanner | Hunter | Dream_wolf -> ()
       )

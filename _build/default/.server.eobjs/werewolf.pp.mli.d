@@ -1,1 +1,1 @@
-werewolf.pp.mli: Core Input Or_error Page Role Shared Username
+werewolf.pp.mli: Core Input Or_error Page Role Settings Shared Username
