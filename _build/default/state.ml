@@ -193,6 +193,23 @@ module Setup = struct
 
   let role_input t role ~is_admin = number_select t role ~is_admin
 
+  let role_rank = function
+    | Role.Werewolf -> 0
+    | Mystic_wolf -> 1
+    | Dream_wolf -> 2
+    | Alpha_wolf -> 3
+    | Minion -> 4
+    | Tanner -> 5
+    | Seer -> 6
+    | Robber _ -> 7
+    | Troublemaker _ -> 8
+    | Mason -> 9
+    | Villager -> 10
+    | Insomniac -> 11
+    | Drunk _ -> 12
+    | Hunter -> 13
+    | Doppelganger _ -> 14
+
   let get_page t user =
     let html =
       let open Html in
@@ -211,7 +228,11 @@ module Setup = struct
       match page with
       | `Settings -> Settings.get_page t.settings ~is_admin
       | `Setup ->
-          let inputs = List.map Role.all ~f:(role_input t ~is_admin) in
+          let roles =
+            let cmp r1 r2 = Int.compare (role_rank r1) (role_rank r2) in
+            List.sort Role.all ~compare:cmp
+          in
+          let inputs = List.map roles ~f:(role_input t ~is_admin) in
           let players = String.concat ~sep:", " t.users in
           let refresh = if is_admin then " (&#8635; page to update)" else "" in
           div []
