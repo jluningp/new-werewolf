@@ -167,7 +167,10 @@ module Setup = struct
           ; ("value", roles)
           ; ("id", role_str)
           ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
-        @ if not is_admin then [("disabled", "")] else [] )
+        @
+        if not is_admin then
+          [("disabled", ""); ("style", "background-color: gray")]
+        else [] )
         []
     in
     div []
@@ -187,8 +190,10 @@ module Setup = struct
                 [text ("&nbsp;&nbsp;" ^ role_str)] ] ]
       else
         [ div [("class", "quantity")]
-            [input ~is_admin; label [("for", role_str)] [text (" " ^ role_str)]]
-        ] )
+            [ input ~is_admin
+            ; label
+                [("for", role_str); ("class", "quantity_label")]
+                [text ("&nbsp;&nbsp;" ^ role_str)] ] ] )
 
   let role_input t role ~is_admin = number_select t role ~is_admin
 
