@@ -169,7 +169,7 @@ module Setup = struct
           ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
         @
         if not is_admin then
-          [("disabled", ""); ("style", "background-color: gray")]
+          [("disabled", ""); ("style", "background-color: gray; color: white;")]
         else [] )
         []
     in
