@@ -87,7 +87,12 @@ module Query = struct
         if Set.mem available_files filename then Some (File filename) else None
 end
 
+let now_unix () =
+  let now = Time_ns.now () in
+  Time_ns.to_int_ns_since_epoch now
+
 let server port () =
+  Random.init (now_unix ()) ;
   let t = {state = State.create ()} in
   let callback ~body:_ _conn req =
     match Query.parse (Request.uri req) with
