@@ -167,7 +167,7 @@ module Setup = struct
           ; ("value", roles)
           ; ("id", role_str)
           ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
-        @ if is_admin then [("disabled", "")] else [] )
+        @ if not is_admin then [("disabled", "")] else [] )
         []
     in
     div []
