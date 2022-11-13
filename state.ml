@@ -186,7 +186,7 @@ module Setup = struct
                 [text ("&nbsp;&nbsp;" ^ role_str)] ] ]
       else
         [ div [("class", "quantity")]
-            [ input
+            [ a [("class", "quantity__input")] [text roles]
             ; label
                 [("for", role_str); ("class", "quantity_label")]
                 [text ("&nbsp;&nbsp;" ^ role_str)] ] ] )
