@@ -80,6 +80,7 @@ function createGame () {
 function joinGame () {
     updateUsername();
     var code = document.getElementById("code").value;
+    code = code.toUpperCase();
     get("action/join?" + usernameQuery() + "&code=" + code, getUpdatedPage);
 }
     
