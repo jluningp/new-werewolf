@@ -160,14 +160,20 @@ module Setup = struct
     in
     let role_str = Role.to_string_unnumbered role in
     div []
-      [ label [("for", role_str)] [text (role_str ^ ": ")]
+      [ span
+          [("class", "down"); ("onclick", "decrInput('" ^ role_str ^ "')")]
+          [text "&#8681;"]
       ; input
           ( [ ("type", "number")
             ; ("id", role_str)
             ; ("value", roles)
             ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
           @ if is_admin then [] else [("disabled", "")] )
-          [] ]
+          []
+      ; span
+          [("class", "up"); ("onclick", "incrInput('" ^ role_str ^ "')")]
+          [text "&#8679;"]
+      ; label [("for", role_str)] [text (" " ^ role_str)] ]
 
   let single_select t role ~is_admin =
     let open Html in
@@ -177,7 +183,7 @@ module Setup = struct
     let role_str = Role.to_string role in
     let checked = Option.is_some roles in
     div []
-      [ label [("for", role_str)] [text (role_str ^ ":  ")]
+      [ span [("class", "placeholder_up")] [text "&#8681;"]
       ; label [("class", "switch")]
           [ input
               ( [ ("type", "checkbox")
@@ -187,7 +193,9 @@ module Setup = struct
               @ (if is_admin then [] else [("disabled", "")])
               @ if checked then [("checked", "")] else [] )
               []
-          ; span [("class", "slider round")] [] ] ]
+          ; span [("class", "slider round")] [] ]
+      ; span [("class", "placeholder_up")] [text "&#8679;"]
+      ; label [("for", role_str)] [text (" " ^ role_str)] ]
 
   let role_input t role ~is_admin =
     match role with

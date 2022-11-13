@@ -158,4 +158,20 @@ function setSetting(setting) {
     get("action/set_setting?" + usernameQuery () + "&" + "setting=" + setting + "&" + "is_on=" + checked, getUpdatedPage)
 }
 
+function incrInput(role) {
+    var count = document.getElementById(role).value;
+    document.getElementById(role).value = parseInt(count) + 1;
+    changeNumberedRole(role)
+}
+
+function decrInput(role) {
+    console.log(role);
+    var count = document.getElementById(role).value;
+    count = parseInt(count)
+    if (count > 0) {
+        document.getElementById(role).value = count - 1;
+        changeNumberedRole(role)
+    }
+}
+
 getUpdatedPage();
