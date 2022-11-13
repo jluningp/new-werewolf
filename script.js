@@ -160,6 +160,10 @@ function setSetting(setting) {
 
 function incrInput(role) {
     var count = document.getElementById(role).value;
+    var count = parseInt(count);
+    if ((role === "Alpha Wolf" || role === "Doppelganger") && count >= 1) {
+        return 
+    }
     document.getElementById(role).value = parseInt(count) + 1;
     changeNumberedRole(role)
 }

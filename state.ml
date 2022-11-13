@@ -159,50 +159,38 @@ module Setup = struct
       |> List.fold ~init:0 ~f:( + ) |> Int.to_string
     in
     let role_str = Role.to_string_unnumbered role in
-    div []
-      [ span
-          [("class", "down"); ("onclick", "decrInput('" ^ role_str ^ "')")]
-          [text "&#8681;"]
-      ; input
-          ( [ ("type", "number")
-            ; ("id", role_str)
-            ; ("value", roles)
-            ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
-          @ if is_admin then [] else [("disabled", "")] )
-          []
-      ; span
-          [("class", "up"); ("onclick", "incrInput('" ^ role_str ^ "')")]
-          [text "&#8679;"]
-      ; label [("for", role_str)] [text (" " ^ role_str)] ]
-
-  let single_select t role ~is_admin =
-    let open Html in
-    let roles =
-      List.find t.roles ~f:(fun (n, r) -> Role.equal role r && n > 0)
+    let input ~is_admin =
+      input
+        ( [ ("name", "quantity")
+          ; ("type", "number")
+          ; ("class", "quantity__input")
+          ; ("value", roles)
+          ; ("id", role_str)
+          ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
+        @ if is_admin then [("disabled", "")] else [] )
+        []
     in
-    let role_str = Role.to_string role in
-    let checked = Option.is_some roles in
     div []
-      [ span [("class", "placeholder_up")] [text "&#8681;"]
-      ; label [("class", "switch")]
-          [ input
-              ( [ ("type", "checkbox")
-                ; ("id", role_str)
-                ; ("onchange", "changeSingleRole('" ^ role_str ^ "')")
-                ; ("type", "checkbox") ]
-              @ (if is_admin then [] else [("disabled", "")])
-              @ if checked then [("checked", "")] else [] )
-              []
-          ; span [("class", "slider round")] [] ]
-      ; span [("class", "placeholder_up")] [text "&#8679;"]
-      ; label [("for", role_str)] [text (" " ^ role_str)] ]
+      ( if is_admin then
+        [ div [("class", "quantity")]
+            [ a
+                [ ("href", "#")
+                ; ("class", "quantity__minus")
+                ; ("onclick", "decrInput('" ^ role_str ^ "')") ]
+                [span [] [text "-"]]
+            ; input ~is_admin
+            ; a
+                [ ("href", "#")
+                ; ("class", "quantity__plus")
+                ; ("onclick", "incrInput('" ^ role_str ^ "')") ]
+                [span [] [text "+"]]
+            ; label [("for", role_str)] [text ("&nbsp;" ^ role_str)] ] ]
+      else
+        [ div [("class", "quantity")]
+            [input ~is_admin; label [("for", role_str)] [text (" " ^ role_str)]]
+        ] )
 
-  let role_input t role ~is_admin =
-    match role with
-    | Role.Werewolf | Mystic_wolf | Dream_wolf | Villager | Insomniac | Mason
-     |Seer | Tanner | Minion | Hunter | Robber _ | Troublemaker _ | Drunk _ ->
-        number_select t role ~is_admin
-    | Alpha_wolf | Doppelganger _ -> single_select t role ~is_admin
+  let role_input t role ~is_admin = number_select t role ~is_admin
 
   let get_page t user =
     let html =

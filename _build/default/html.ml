@@ -21,32 +21,22 @@ type t =
   | B of Attr.t list * t list
   | Img of Attr.t list * t list
   | Span of Attr.t list * t list
+  | A of Attr.t list * t list
 
 let div a t = Div (a, t)
-
 let button a t = Button (a, t)
-
 let p a t = P (a, t)
-
 let label a t = Label (a, t)
-
 let li a t = Li (a, t)
-
 let ul a t = Ul (a, t)
-
 let input a t = Input (a, t)
-
 let text str = Text str
-
 let br = Br
-
 let refresh_page = Refresh_page
-
 let b a t = B (a, t)
-
 let img a t = Img (a, t)
-
 let span a t = Span (a, t)
+let a attr t = A (attr, t)
 
 let attrs_to_string attrs =
   List.map attrs ~f:Attr.to_string |> String.concat ~sep:" "
@@ -69,8 +59,7 @@ and to_string = function
   | B (a, t) -> to_html_tags "b" (a, t)
   | Img (a, t) -> to_html_tags "img" (a, t)
   | Span (a, t) -> to_html_tags "span" (a, t)
+  | A (a, t) -> to_html_tags "a" (a, t)
   | Refresh_page ->
       to_string
-        (div
-           [ ("id", "refreshpage"); ("style", "display: none;") ]
-           [ text "500" ])
+        (div [("id", "refreshpage"); ("style", "display: none;")] [text "500"])
