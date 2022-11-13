@@ -174,17 +174,17 @@ module Setup = struct
       ( if is_admin then
         [ div [("class", "quantity")]
             [ a
-                [ ("href", "#")
-                ; ("class", "quantity__minus")
+                [ ("class", "quantity__minus")
                 ; ("onclick", "decrInput('" ^ role_str ^ "')") ]
-                [span [] [text "-"]]
+                [span [("class", "prevent_select")] [text "-"]]
             ; input ~is_admin
             ; a
-                [ ("href", "#")
-                ; ("class", "quantity__plus")
+                [ ("class", "quantity__plus")
                 ; ("onclick", "incrInput('" ^ role_str ^ "')") ]
-                [span [] [text "+"]]
-            ; label [("for", role_str)] [text ("&nbsp;" ^ role_str)] ] ]
+                [span [("class", "prevent_select")] [text "+"]]
+            ; label
+                [("for", role_str); ("class", "quantity_label")]
+                [text ("&nbsp;&nbsp;" ^ role_str)] ] ]
       else
         [ div [("class", "quantity")]
             [input ~is_admin; label [("for", role_str)] [text (" " ^ role_str)]]
