@@ -159,18 +159,14 @@ module Setup = struct
       |> List.fold ~init:0 ~f:( + ) |> Int.to_string
     in
     let role_str = Role.to_string_unnumbered role in
-    let input ~is_admin =
+    let input =
       input
-        ( [ ("name", "quantity")
-          ; ("type", "number")
-          ; ("class", "quantity__input")
-          ; ("value", roles)
-          ; ("id", role_str)
-          ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
-        @
-        if not is_admin then
-          [("disabled", ""); ("style", "background-color: gray; color: white;")]
-        else [] )
+        [ ("name", "quantity")
+        ; ("type", "number")
+        ; ("class", "quantity__input")
+        ; ("value", roles)
+        ; ("id", role_str)
+        ; ("onchange", "changeNumberedRole('" ^ role_str ^ "')") ]
         []
     in
     div []
@@ -180,7 +176,7 @@ module Setup = struct
                 [ ("class", "quantity__minus")
                 ; ("onclick", "decrInput('" ^ role_str ^ "')") ]
                 [span [("class", "prevent_select")] [text "-"]]
-            ; input ~is_admin
+            ; input
             ; a
                 [ ("class", "quantity__plus")
                 ; ("onclick", "incrInput('" ^ role_str ^ "')") ]
@@ -190,7 +186,7 @@ module Setup = struct
                 [text ("&nbsp;&nbsp;" ^ role_str)] ] ]
       else
         [ div [("class", "quantity")]
-            [ input ~is_admin
+            [ input
             ; label
                 [("for", role_str); ("class", "quantity_label")]
                 [text ("&nbsp;&nbsp;" ^ role_str)] ] ] )
