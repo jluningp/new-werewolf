@@ -18,4 +18,5 @@ val b : Attr.t list -> t list -> t
 val img : Attr.t list -> t list -> t
 val span : Attr.t list -> t list -> t
 val a : Attr.t list -> t list -> t
+val hr : t
 val to_string : t -> string

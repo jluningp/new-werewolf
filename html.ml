@@ -22,6 +22,7 @@ type t =
   | Img of Attr.t list * t list
   | Span of Attr.t list * t list
   | A of Attr.t list * t list
+  | Hr
 
 let div a t = Div (a, t)
 let button a t = Button (a, t)
@@ -37,6 +38,7 @@ let b a t = B (a, t)
 let img a t = Img (a, t)
 let span a t = Span (a, t)
 let a attr t = A (attr, t)
+let hr = Hr
 
 let attrs_to_string attrs =
   List.map attrs ~f:Attr.to_string |> String.concat ~sep:" "
@@ -60,6 +62,7 @@ and to_string = function
   | Img (a, t) -> to_html_tags "img" (a, t)
   | Span (a, t) -> to_html_tags "span" (a, t)
   | A (a, t) -> to_html_tags "a" (a, t)
+  | Hr -> "<hr>"
   | Refresh_page ->
       to_string
         (div [("id", "refreshpage"); ("style", "display: none;")] [text "500"])

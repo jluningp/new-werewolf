@@ -22,37 +22,66 @@ end
 
 module Join = struct
   let create_game =
-    Html.div [("class", "button"); ("onclick", "createGame()")] [Html.text "GO"]
+    Html.div
+      [("id", "createbutton"); ("class", "button"); ("onclick", "createGame()")]
+      [Html.text "Create!"]
 
   let join_game =
-    Html.div [("class", "button"); ("onclick", "joinGame()")] [Html.text "GO"]
+    Html.div
+      [("id", "joinbutton"); ("class", "button"); ("onclick", "joinGame()")]
+      [Html.text "Join!"]
 
   let get_page ~username =
     let username = Option.value ~default:"" username in
     let username_input =
       Html.(
         div []
-          [ text "NAME: "
+          [ span [("class", "label")] [text "Username"]
+          ; br
           ; input
               [("type", "text"); ("id", "username"); ("value", username)]
-              []
-          ; br ])
+              [] ])
     in
     let game_code_input =
       Html.(
-        input [("type", "text"); ("id", "code"); ("placeholder", "CODE")] [])
+        div []
+          [ span [("class", "label")] [text "Game Code"]
+          ; br
+          ; input [("type", "text"); ("id", "code")] [] ])
     in
-    Html.div []
-      [ username_input
-      ; Html.br
-      ; Html.text "New Game: "
-      ; create_game
-      ; Html.br
-      ; Html.br
-      ; Html.text "Join Game: "
-      ; game_code_input
-      ; Html.text " "
-      ; join_game ]
+    let header which =
+      let set_highlight ~tab =
+        match (which, tab) with
+        | `Join, `Join | `Create, `Create -> [("class", "highlight")]
+        | _ -> []
+      in
+      Html.(
+        div [("class", "tabheader")]
+          [ div
+              ( set_highlight ~tab:`Create
+              @ [("id", "createtab"); ("onclick", "createTab()")] )
+              [text "Create Game"]
+          ; div [("class", "tabbox")]
+              [ div
+                  ( set_highlight ~tab:`Join
+                  @ [("id", "jointab"); ("onclick", "joinTab()")] )
+                  [text "Join Game"] ]
+          ; br ])
+    in
+    Html.(
+      div [("class", "createstart")]
+        [ div
+            [("id", "createPage"); ("class", "startWrap")]
+            [ div [("id", "start")]
+                [header `Create; username_input; create_game] ]
+        ; div
+            [("id", "joinPage"); ("class", "startWrap")]
+            [ div [("id", "start")]
+                [ header `Join
+                ; username_input
+                ; game_code_input
+                ; text " "
+                ; join_game ] ] ])
     |> Html.to_string
 end
 

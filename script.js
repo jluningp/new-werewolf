@@ -43,6 +43,20 @@ function updateUsername () {
     }
 }
 
+function setStartingTab() {
+    var create = document.getElementById("createPage");
+    var join = document.getElementById("joinPage");
+    if (create && createTab) {
+        if (document.getElementById("tab").value == "create") {
+            create.style.display="block";
+            join.style.display="none";
+        } else {
+            join.style.display="block";
+            create.style.display="none";
+        }
+    }
+}
+
 function replaceContent (content) {
     var el = document.createElement( 'body' );
     el.innerHTML = content;		
@@ -55,7 +69,9 @@ function replaceContent (content) {
     if (refresh) {
 	setTimeout(getUpdatedPage, refresh.innerHTML)
     }
+    setStartingTab()
 }
+
 
 function getUpdatedPage () {
     var username = getCookie("username")
@@ -153,6 +169,23 @@ function toSettings () {
 function toSetup () {
     get("action/to_setup?" + usernameQuery (), getUpdatedPage)
 }
+
+function joinTab () {
+    var tab = document.getElementById("tab")
+    if (tab) {
+        tab.value = "join"
+        setStartingTab()
+    }
+}
+
+function createTab () {
+    var tab = document.getElementById("tab")
+    if (tab) {
+        tab.value = "create"
+        setStartingTab()
+    }
+}
+
 
 function setSetting(setting) {
     var checked = document.getElementById(setting).checked;
