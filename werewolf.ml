@@ -178,6 +178,7 @@ let role_to_string_unnumbered_if_unique ?(ignore_settings = false)
           | Robber _, Robber _ -> true
           | Troublemaker _, Troublemaker _ -> true
           | Drunk _, Drunk _ -> true
+          | Voodoo_lou _, Voodoo_lou _ -> true
           | _, _ -> Role.equal role other_role )
     in
     if role_count = 1 then Role.to_string_unnumbered role
