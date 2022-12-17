@@ -6,6 +6,7 @@ module Random_cache : sig
 
   val create : lone_werewolf_sees_non_werewolf_center_card:bool -> t
   val drunk_card : t -> Username.t -> int
+  val voodoo_lou_card : t -> Username.t -> int
 
   val werewolf_sees_card :
     t -> Username.t -> non_werewolf_indices:int list -> int
@@ -17,14 +18,19 @@ end = struct
     ; seer_doesnt_see_card : int Username.Table.t
     ; seer_doesnt_see_card__if_werewolf_card : int Username.Table.t
     ; werewolf_sees_card : int Username.Table.t
-    ; drunk_card : int Username.Table.t }
+    ; drunk_card : int Username.Table.t
+    ; voodoo_lou_card : int Username.Table.t }
 
   let create ~lone_werewolf_sees_non_werewolf_center_card =
     { lone_werewolf_sees_non_werewolf_center_card
     ; seer_doesnt_see_card = Username.Table.create ()
     ; seer_doesnt_see_card__if_werewolf_card = Username.Table.create ()
     ; werewolf_sees_card = Username.Table.create ()
-    ; drunk_card = Username.Table.create () }
+    ; drunk_card = Username.Table.create ()
+    ; voodoo_lou_card = Username.Table.create () }
+
+  let voodoo_lou_card t user =
+    Hashtbl.find_or_add t.voodoo_lou_card user ~default:(fun () -> Random.int 3)
 
   let drunk_card t user =
     Hashtbl.find_or_add t.drunk_card user ~default:(fun () -> Random.int 3)
@@ -62,11 +68,14 @@ module Phase = struct
       | Viewer
       | Alpha_wolf
       | Robber of int
+      | Voodoo_lou of int
       | Troublemaker of int
       | Dawn
+    [@@deriving sexp_of]
   end
 
   type t = View_roles | Day | Night of Night.t | Vote | Results
+  [@@deriving sexp_of]
 end
 
 module User = struct
@@ -148,6 +157,7 @@ let is_users_turn night_phase (user : User.t) =
   | Alpha_wolf, Alpha_wolf -> true
   | Robber n1, Robber n2 when n1 = n2 -> true
   | Troublemaker n1, Troublemaker n2 when n1 = n2 -> true
+  | Voodoo_lou n1, Voodoo_lou n2 when n1 = n2 -> true
   | Dawn, (Drunk _ | Insomniac | Doppelganger (Some Insomniac)) -> true
   | Doppelganger, Doppelganger _ -> true
   | Doppelganger_seer, Doppelganger (Some Seer) -> true
@@ -347,6 +357,27 @@ let get_page_for_minion t (user : User.t) =
   | [Ack; Ack] -> [Text "Waiting"]
   | _ -> [Text "An error has occurred. Please start a new game."]
 
+let get_page_for_voodoo_lou t (user : User.t) =
+  match user.inputs with
+  | [Ack] ->
+      let center_card =
+        Random_cache.voodoo_lou_card t.random_cache user.username
+        |> List.nth_exn t.center_cards
+      in
+      [ Page.Element.Text
+          "Swap this card from the center with your own card or another \
+           player's card:"
+      ; Cards [center_card]
+      ; Centered_text
+          ("The " ^ role_to_string_unnumbered_if_unique t center_card)
+      ; Choose_user
+          { choose_this_many = 1
+          ; users = Hashtbl.keys t.users
+          ; or_center = false
+          ; or_no_werewolf = false } ]
+  | [Choose_user _; Ack] -> [Text "Waiting"]
+  | _ -> [Text "An error has occurred. Please start a new game."]
+
 let get_page_for_werewolf t (user : User.t) =
   match user.inputs with
   | [Ack] -> (
@@ -458,6 +489,7 @@ let get_page_for_doppleganger t (user : User.t) =
             | Mason -> get_page_for_mason t user
             | Insomniac -> get_page_for_insomniac t user
             | Drunk _ -> get_page_for_drunk t user
+            | Voodoo_lou _ -> get_page_for_voodoo_lou t user
             | Doppelganger _ ->
                 [Text "An error has occurred. Please start a new game."] )
         | _ -> [Text "An error has occurred. Please start a new game."] )
@@ -662,6 +694,7 @@ let get_page_for_user t (user : User.t) =
         | Drunk _ -> get_page_for_drunk t user
         | Mystic_wolf -> get_page_for_mystic_wolf t user
         | Alpha_wolf -> get_page_for_alpha_wolf t user
+        | Voodoo_lou _ -> get_page_for_voodoo_lou t user
         | Doppelganger _ -> get_page_for_doppleganger t user )
 
 let validate_input t (user : User.t) (input : Input.t) =
@@ -705,6 +738,11 @@ let validate_input t (user : User.t) (input : Input.t) =
           | [Ack], View_center_cards -> true
           | [Choose_user _; Ack], Ack -> true
           | [View_center_cards; Ack], Ack -> true
+          | _ -> false )
+        | Voodoo_lou _ -> (
+          match (user_inputs, input) with
+          | [], Ack -> true
+          | [Ack], Choose_user [username] -> Hashtbl.mem t.users username
           | _ -> false )
         | Troublemaker _ -> (
           match (user_inputs, input) with
@@ -859,6 +897,22 @@ let record_action t (user : User.t) (input : Input.t) =
           match (user_inputs, input) with
           | [Ack], Choose_user [user1; user2] ->
               User.record_action user !"Swapped %s and %s" user1 user2
+          | _ -> () )
+        | Voodoo_lou _ -> (
+          match (user_inputs, input) with
+          | [Ack], Choose_user [swapped_with] ->
+              let center_card =
+                Random_cache.voodoo_lou_card t.random_cache user.username
+                |> List.nth_exn t.center_cards
+              in
+              let who =
+                if Username.equal swapped_with user.username then "your own"
+                else sprintf "%s's" swapped_with
+              in
+              User.record_action user
+                !"Swapped %s card with a center card (the %s)."
+                who
+                (role_to_string_unnumbered_if_unique t center_card)
           | _ -> () )
         | Mason -> (
           match (user_inputs, input) with
@@ -1027,7 +1081,7 @@ let rec maybe_change_phase t =
                 not (List.length user.inputs = 4)
             | Doppelganger _ | Robber _ | Troublemaker _ | Villager
              |Insomniac | Tanner | Drunk _ | Hunter | Dream_wolf | Alpha_wolf
-              ->
+             |Voodoo_lou _ ->
                 false )
         |> Hashtbl.is_empty
       in
@@ -1047,8 +1101,27 @@ let rec maybe_change_phase t =
             match role with Robber _ -> true | _ -> false )
       in
       let phase =
-        if n >= robber_count - 1 then Phase.Night (Troublemaker 0)
+        if n >= robber_count - 1 then Phase.Night (Voodoo_lou 0)
         else Night (Robber (n + 1))
+      in
+      if phase_over then (
+        t.phase <- phase ;
+        maybe_change_phase t )
+  | Night (Voodoo_lou n) ->
+      let phase_over =
+        Hashtbl.filter t.users ~f:(fun user ->
+            match user.original_role with
+            | Voodoo_lou n' when n' = n -> not (List.length user.inputs = 2)
+            | _ -> false )
+        |> Hashtbl.is_empty
+      in
+      let vl_count =
+        List.count t.all_roles ~f:(fun role ->
+            match role with Voodoo_lou _ -> true | _ -> false )
+      in
+      let phase =
+        if n >= vl_count - 1 then Phase.Night (Troublemaker 0)
+        else Night (Voodoo_lou (n + 1))
       in
       if phase_over then (
         t.phase <- phase ;
@@ -1129,6 +1202,24 @@ let on_input t username input =
                     other_user.current_role <- user.current_role ;
                     user.current_role <- other_role )
               | _ -> assert false )
+            | Voodoo_lou _ -> (
+              match input with
+              | Ack -> ()
+              | Choose_user [username] ->
+                  let chosen_user = Hashtbl.find_exn t.users username in
+                  let current_role = chosen_user.current_role in
+                  let center_card_idx =
+                    Random_cache.voodoo_lou_card t.random_cache user.username
+                  in
+                  let center_card =
+                    List.nth_exn t.center_cards center_card_idx
+                  in
+                  chosen_user.current_role <- center_card ;
+                  t.center_cards
+                  <- List.mapi t.center_cards ~f:(fun idx card ->
+                         if idx = center_card_idx then current_role else card
+                     )
+              | _ -> () )
             | Troublemaker _ -> (
               match input with
               | Ack -> ()

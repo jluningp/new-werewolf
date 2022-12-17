@@ -184,6 +184,7 @@ module Setup = struct
           | Role.Robber _, Robber _ -> Some n
           | Troublemaker _, Troublemaker _ -> Some n
           | Drunk _, Drunk _ -> Some n
+          | Voodoo_lou _, Voodoo_lou _ -> Some n
           | _, _ -> if Role.equal role r then Some n else None )
       |> List.fold ~init:0 ~f:( + ) |> Int.to_string
     in
@@ -231,13 +232,14 @@ module Setup = struct
     | Tanner -> 5
     | Seer -> 6
     | Robber _ -> 7
-    | Troublemaker _ -> 8
-    | Mason -> 9
-    | Villager -> 10
-    | Insomniac -> 11
-    | Drunk _ -> 12
-    | Hunter -> 13
-    | Doppelganger _ -> 14
+    | Voodoo_lou _ -> 8
+    | Troublemaker _ -> 9
+    | Mason -> 10
+    | Villager -> 11
+    | Insomniac -> 12
+    | Drunk _ -> 13
+    | Hunter -> 14
+    | Doppelganger _ -> 15
 
   let get_page t user =
     let html =
@@ -319,6 +321,7 @@ module Setup = struct
             | Role.Troublemaker _, Troublemaker _ -> false
             | Robber _, Robber _ -> false
             | Drunk _, Drunk _ -> false
+            | Voodoo_lou _, Voodoo_lou _ -> false
             | _ -> true )
       in
       let numbered_role =
@@ -327,6 +330,7 @@ module Setup = struct
             | Role.Troublemaker _ -> (1, Role.Troublemaker i)
             | Robber _ -> (1, Robber i)
             | Drunk _ -> (1, Drunk i)
+            | Voodoo_lou _ -> (1, Voodoo_lou i)
             | _ ->
                 failwith
                   "Tried to set numbered role, but role is not robber, drunk, \
@@ -344,7 +348,7 @@ module Setup = struct
 
   let set_role t role count =
     match role with
-    | Role.Troublemaker _ | Role.Robber _ | Role.Drunk _ ->
+    | Role.Troublemaker _ | Role.Robber _ | Role.Drunk _ | Role.Voodoo_lou _ ->
         set_numbered_role t role count
     | _ -> set_unnumbered_role t role count
 end

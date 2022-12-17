@@ -18,6 +18,7 @@ module Role : sig
     | Mystic_wolf
     | Dream_wolf
     | Alpha_wolf
+    | Voodoo_lou of int
     | Doppelganger of t option
   [@@deriving sexp, compare, enumerate]
 

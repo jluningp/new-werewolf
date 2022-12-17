@@ -18,6 +18,7 @@ module Role = struct
     | Mystic_wolf
     | Dream_wolf
     | Alpha_wolf
+    | Voodoo_lou of int
     | Doppelganger of t option
   [@@deriving sexp, compare]
 
@@ -38,6 +39,7 @@ module Role = struct
     ; Mystic_wolf
     ; Dream_wolf
     ; Alpha_wolf
+    ; Voodoo_lou 0
     ; Doppelganger None ]
 
   let card_image role =
@@ -56,6 +58,7 @@ module Role = struct
     | Mystic_wolf -> "images/mystic_wolf.png"
     | Dream_wolf -> "images/dream_wolf.png"
     | Alpha_wolf -> "images/alpha_wolf.png"
+    | Voodoo_lou _ -> "images/voodoolous.jpeg"
     | Doppelganger _ -> "images/doppelgangers.png"
 
   let rec cardinal_to_string = function
@@ -83,13 +86,15 @@ module Role = struct
           let numbered_roles =
             [ ((fun n -> Robber n), " Robber")
             ; ((fun n -> Troublemaker n), " Troublemaker")
-            ; ((fun n -> Drunk n), " Drunk") ]
+            ; ((fun n -> Drunk n), " Drunk")
+            ; ((fun n -> Voodoo_lou n), " Voodoo Lou") ]
           in
           List.find_map numbered_roles ~f:(fun (make_role, suffix) ->
               match str with
               | "Troublemaker" -> Some (Troublemaker 0)
               | "Drunk" -> Some (Drunk 0)
               | "Robber" -> Some (Robber 0)
+              | "Voodoo Lou" -> Some (Voodoo_lou 0)
               | _ ->
                   if String.is_suffix str ~suffix then
                     Some (make_role (cardinal_of_string (String.prefix str 3)))
@@ -108,6 +113,7 @@ module Role = struct
     | Drunk n -> cardinal_to_string (n + 1) ^ " Drunk"
     | Troublemaker n -> cardinal_to_string (n + 1) ^ " Troublemaker"
     | Robber n -> cardinal_to_string (n + 1) ^ " Robber"
+    | Voodoo_lou n -> cardinal_to_string (n + 1) ^ " Voodoo Lou"
     | _ -> Sexp.to_string (sexp_of_t t)
 
   let to_string_unnumbered t =
@@ -119,6 +125,7 @@ module Role = struct
     | Drunk _ -> "Drunk"
     | Troublemaker _ -> "Troublemaker"
     | Robber _ -> "Robber"
+    | Voodoo_lou _ -> "Voodoo Lou"
     | _ -> Sexp.to_string (sexp_of_t t)
 end
 
