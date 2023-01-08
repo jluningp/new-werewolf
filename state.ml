@@ -33,13 +33,18 @@ module Join = struct
 
   let get_page ~username =
     let username = Option.value ~default:"" username in
-    let username_input =
+    let username_input which =
+      let suffix =
+        match which with `Create -> "-create" | `Join -> "-join"
+      in
       Html.(
         div []
           [ span [("class", "label")] [text "Username"]
           ; br
           ; input
-              [("type", "text"); ("id", "username"); ("value", username)]
+              [ ("type", "text")
+              ; ("id", "username" ^ suffix)
+              ; ("value", username) ]
               [] ])
     in
     let game_code_input =
@@ -73,12 +78,12 @@ module Join = struct
         [ div
             [("id", "createPage"); ("class", "startWrap")]
             [ div [("id", "start")]
-                [header `Create; username_input; create_game] ]
+                [header `Create; username_input `Create; create_game] ]
         ; div
             [("id", "joinPage"); ("class", "startWrap")]
             [ div [("id", "start")]
                 [ header `Join
-                ; username_input
+                ; username_input `Join
                 ; game_code_input
                 ; text " "
                 ; join_game ] ] ])

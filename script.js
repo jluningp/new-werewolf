@@ -37,9 +37,15 @@ function setCookie(name, value, options = {}) {
 
 
 function updateUsername () {
-    var username = document.getElementById("username").value;
-    if (!(username === "")) {
-	setCookie("username", username)
+    var tabElt = document.getElementById("tab");
+    if (tabElt) {
+        var username = document.getElementById("username-join").value;
+        if (tabElt.value == "create") {
+            var username = document.getElementById("username-create").value;
+        }
+        if (username && !(username === "")) {
+	    setCookie("username", username)
+        }
     }
 }
 
